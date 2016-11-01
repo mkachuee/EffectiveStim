@@ -104,8 +104,10 @@ def extract_targets(block_data, debug=False):
             #embed()
         return None
      
-    extracted_targets.append(force)
-    extracted_targets.append(area)
+    #extracted_targets.append(force)
+    #extracted_targets.append(area)
+    extracted_targets.append(forces)
+    #extracted_targets.append(areas)
 
    
     if debug:
