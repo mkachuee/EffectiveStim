@@ -269,7 +269,7 @@ class TdtIO(BaseIO):
         bl.file_origin = tankname
         
         seg = self.read_segment(blockname, lazy=False, cascade=False)
-        block_data = {}
+        block_data = {'path':self.dirname+'/'+blockname}
         for tev_analog in seg.analogsignals:
             block_data[tev_analog.name+'.tev'] = np.array(tev_analog).ravel()
 
