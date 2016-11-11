@@ -9,7 +9,7 @@ import preprocessing
 
 plt.ion()
 
-def extract_targets(block_data, debug=False):
+def extract_targets_mvc(block_data, debug=False):
     """
     one target vector per block
     """
