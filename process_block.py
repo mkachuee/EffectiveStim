@@ -5,6 +5,7 @@ import numpy as np
 import scipy.signal
 import matplotlib.pyplot as plt
 
+import preprocessing
 
 plt.ion()
 
@@ -90,7 +91,9 @@ def extract_targets(block_data, debug=False):
     force = np.median(forces)
     area = np.median(areas)
     diff_ration = np.abs(1-(forces/force))
-    if (diff_ration > 0.5).any():
+    
+    if (diff_ration > 0.25).any():
+        print('WARNING: high MVC variation')
         if debug:
             plt.clf()
             plt.plot(sig_pulse)
@@ -102,11 +105,12 @@ def extract_targets(block_data, debug=False):
             plt.draw()
             pdb.set_trace()
             #embed()
-        return None
+        #FIXME
+        #return None
      
     #extracted_targets.append(force)
     #extracted_targets.append(area)
-    extracted_targets.append(forces)
+    extracted_targets = np.hstack([forces.ravel(), areas.ravel()])
     #extracted_targets.append(areas)
 
    
@@ -123,4 +127,95 @@ def extract_targets(block_data, debug=False):
         #embed()
 
     return np.hstack(extracted_targets)
+   
+def extract_targets_emg(block_data, debug=False):
+    """
+    one target vector per block
+    """
+    extracted_targets = []#{}
+    # load signals
+    sig_pulse = block_data['ADC_ 1.tev']
+    ind_s = int(len(sig_pulse)*0.2)
+    ind_e = int(len(sig_pulse)*0.8)
+    sig_emg = block_data['sev'][0]
+
+    # decimate them
+    sig_pulse = sig_pulse[::10]
+    sig_emg = sig_emg[::10]
+    
+    # preprocess them
+    sig_pulse = np.abs(sig_pulse)
+    sig_emg = np.abs(sig_emg)
+    
+    sig_pulse = scipy.signal.medfilt(sig_pulse, 501)
+    #sig_emg = preprocessing.filter_iir_fwbw(sig_emg, fs_in=2000.0, 
+    #        fs_out=2000.0, fc1=1.0, fc2=25.0, degree=3, plot=False)
+    sig_emg = np.convolve(sig_emg, np.ones((400,))/400.0, 'valid')
+
+    sig_pulse = (sig_pulse-sig_pulse.min()) / \
+            (sig_pulse.max()-sig_pulse.min())
+    
+    # threshold
+    sig_pulse[sig_pulse <0.5] = 0
+    sig_pulse[sig_pulse >= 0.5] = 1
+     
+    
+    step_ups = np.nonzero(np.diff(sig_pulse)>0)[0]
+    step_downs = np.nonzero(np.diff(sig_pulse)<0)[0]
+    
+    try:
+        step_diff = step_downs - step_ups
+    except:
+        return None
+    step_ups = np.sort(step_ups[np.argsort(step_diff)[-3:]])
+    step_downs = np.sort(step_downs[np.argsort(step_diff)[-3:]])
+    if len(step_ups) != len(step_downs):
+        if debug:
+            plt.clf()
+            plt.plot(sig_pulse)
+            plt.plot(sig_emg)
+            plt.title('Failed')
+            plt.draw()
+            pdb.set_trace()
+            #embed()
+        return None
+    # TODO: add signal quality check
+
+    emg_parts = []
+    for  (step_up,step_down) in zip(step_ups,step_downs):
+        emg_parts.append(sig_emg[step_up:step_down])
+    
+    if len(emg_parts) != 3:
+        if debug:
+            plt.clf()
+            plt.plot(sig_pulse)
+            plt.plot(sig_emg)
+            plt.title('Failed')
+            plt.draw()
+            pdb.set_trace()
+            #embed()
+        return None
+    else:
+        for part in emg_parts:
+            extracted_targets.append(np.median(\
+                np.sort(part)[int(0.95*len(part)):]))
+        #extracted_targets['emg_peak_1'] = np.median(\
+        #        np.sort(emg_parts[0])[int(0.95*len(emg_parts[0])):])
+        #extracted_targets['emg_peak_2'] = np.median(\
+        #        np.sort(emg_parts[1])[int(0.95*len(emg_parts[1])):])
+        #extracted_targets['emg_peak_3'] = np.median(\
+        #        np.sort(emg_parts[2])[int(0.95*len(emg_parts[2])):])
+    if debug:
+        plt.clf()
+        plt.plot(sig_pulse/10000.0)
+        plt.plot(sig_emg)
+        for part in emg_parts:
+            plt.plot(part)
+        plt.title('accepted')
+        plt.draw()
+        print(extracted_targets)
+        #pdb.set_trace()
+        embed()
+
+    return extracted_targets
    
