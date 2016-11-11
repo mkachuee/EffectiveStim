@@ -77,6 +77,9 @@ def extract_targets_mvc(block_data, debug=False):
     extracted_targets = []
     forces = []
     areas = []
+    if len(mvc_parts) != 3:
+        return
+    
     for part in mvc_parts:
         len_part = len(part)
         forces.append(np.median(np.sort(part)[int(0.95*len_part):]))
@@ -86,11 +89,11 @@ def extract_targets_mvc(block_data, debug=False):
     #    print('B1')
     #    pdb.set_trace()
 
-    areas = np.vstack(areas)
-    forces = np.vstack(forces)
+    #areas = np.vstack(areas)
+    #forces = np.vstack(forces)
     force = np.median(forces)
     area = np.median(areas)
-    diff_ration = np.abs(1-(forces/force))
+    diff_ration = np.abs(1-(np.vstack(forces)/force))
     
     if (diff_ration > 0.25).any():
         print('WARNING: high MVC variation')
@@ -110,7 +113,7 @@ def extract_targets_mvc(block_data, debug=False):
      
     #extracted_targets.append(force)
     #extracted_targets.append(area)
-    extracted_targets = np.hstack([forces.ravel(), areas.ravel()])
+    extracted_targets = forces + areas
     #extracted_targets.append(areas)
 
    
@@ -126,7 +129,7 @@ def extract_targets_mvc(block_data, debug=False):
         pdb.set_trace()
         #embed()
 
-    return np.hstack(extracted_targets)
+    return extracted_targets
    
 def extract_targets_emg(block_data, debug=False):
     """

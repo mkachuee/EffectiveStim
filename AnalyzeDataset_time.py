@@ -55,9 +55,9 @@ exp_ids = np.vstack(exp_ids)
 
 
 
-plt.plot(exp_targets)
+plt.plot(exp_targets[:,:3].max(axis=1))
 plt.xticks(10*np.arange(len(exp_ids[::10])), exp_ids[::10], 
-        rotation=90, fontsize=3)
+        rotation=90, fontsize=6)
 
 
 plt.tight_layout()

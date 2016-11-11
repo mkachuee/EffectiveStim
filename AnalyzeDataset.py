@@ -15,12 +15,12 @@ import supervised_learning
 
 plt.ion()
 
-DATASET_NAME = 'dataset_718885'
+DATASET_NAME = sys.argv[1]#'dataset_718885'
 
-ANALYSIS_VISUALIZATION = False
+ANALYSIS_VISUALIZATION = True
 
 ANALYSIS_CLASSIFICATION = True
-TARGET = 1
+TARGET = None # FIXME
 SCORE_THRESHOLD = 1.2
 
 # load dataset file
@@ -56,6 +56,16 @@ for (session_features, session_targets) in \
 
 exp_features = np.vstack(exp_features)
 exp_targets = np.vstack(exp_targets)
+ 
+inds = exp_features[:,0]<6
+exp_targets = exp_targets[inds,:3].max(axis=1).reshape(-1,1)
+exp_features = exp_features[inds]
+exp_features[:,2] = np.log(exp_features[:,2])
+# apply threshold
+#exp_targets_classes = (exp_targets[:,TARGET] > SCORE_THRESHOLD).astype(np.int)
+exp_targets_classes = (exp_targets > SCORE_THRESHOLD).astype(np.int)
+exp_targets_classes = exp_targets_classes.ravel()
+ #exp_targets_classes = (exp_targets[:,3:].max(axis=1) > SCORE_THRESHOLD).astype(np.int)
 
 # some outlier checks
 # FIXME: uncomment after investigation
@@ -115,14 +125,6 @@ if ANALYSIS_VISUALIZATION:
 
 
 if ANALYSIS_CLASSIFICATION:
-    #TODO: 
-    inds = exp_features[:,0]<6
-    exp_targets = exp_targets[inds]
-    exp_features = exp_features[inds]
-    exp_features[:,2] = np.log(exp_features[:,2])
-    # apply threshold
-    exp_targets_classes = (exp_targets[:,TARGET] > SCORE_THRESHOLD).astype(np.int)
-
     # visualize score classes on exp data
     x = exp_features[:,0]
     y = exp_features[:,1]
@@ -131,7 +133,7 @@ if ANALYSIS_CLASSIFICATION:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    ax.scatter(x, y, z, c=t, marker='o', cmap=cm.jet)
+    ax.scatter(x, y, z, c=t, marker='o', cmap=cm.prism)#, cmap=cm.jet)
     
     ax.set_xlabel('Intensity')
     ax.set_ylabel('Location')

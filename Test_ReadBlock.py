@@ -10,14 +10,13 @@ import neo.io.tdtio as tdtio
 
 plt.ion()
 
-DB_PATH = '/home/' + getpass.getuser() + '/Database/718885/'
-
-
-
-session_name = '718885_2016-07-12_week64_HG1/'
+#DB_PATH = '/home/' + getpass.getuser() + '/Database/718885/'
+DB_PATH = '/media/mohammad/Data/Database/718885/'
+session_name = '718885_2016-10-26_week79_HG29/'
+block_name = 'Block-3'
 
 session = tdtio.TdtIO(dirname=DB_PATH+'Data/' + 2*session_name)
-block_data = session.read_block_improved(blockname='Block-10')
+block_data = session.read_block_improved(blockname=block_name)
 
 
 plt.figure()
@@ -34,6 +33,9 @@ for channel_name in block_data.keys():
             subplot_idx += 1
             plt.plot(block_data['sev'][ind_channel,np.arange(0,len_total,100)])
             plt.title(channel_name + 'CH' + str(ind_channel))
+    elif channel_name == 'path':
+        subplot_idx -= 1
+        pass
     else:
         plt.plot(block_data[channel_name])
         plt.title(channel_name)
