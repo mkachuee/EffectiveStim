@@ -39,8 +39,7 @@ def extract_targets_mvc(block_data, debug=False):
     
     sig_pulse = (sig_pulse-sig_pulse.min()) / \
             (sig_pulse.max()-sig_pulse.min())
-    sig_mvc = scipy.signal.detrend(sig_mvc)
-    sig_mvc[sig_mvc<0] = 0.0
+    
     
     # threshold
     sig_pulse[sig_pulse <0.5] = 0
@@ -53,8 +52,17 @@ def extract_targets_mvc(block_data, debug=False):
         step_diff = step_downs - step_ups
     except:
         return None
+    
+    # take major three ones
     step_ups = np.sort(step_ups[np.argsort(step_diff)[-3:]])
     step_downs = np.sort(step_downs[np.argsort(step_diff)[-3:]])
+    
+    # detrend mvc
+    #sig_mvc = scipy.signal.detrend(sig_mvc)
+    sig_mvc_bias = sig_mvc[:step_ups[0]].mean()
+    sig_mvc = sig_mvc - sig_mvc_bias
+    sig_mvc[sig_mvc<0] = 0.0
+    
     if len(step_ups) != len(step_downs):
         if debug:
             plt.clf()
