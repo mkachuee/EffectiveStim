@@ -17,11 +17,14 @@ plt.ion()
 
 DATASET_NAME = sys.argv[1]#'dataset_718885'
 
-ANALYSIS_VISUALIZATION = True
+ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
 TARGET = None # FIXME
-SCORE_THRESHOLD = 1.2
+SCORE_THRESHOLD = 1.4
+
+LEARNER = 'svm'
+
 
 # load dataset file
 dataset = scipy.io.loadmat('./run_data/' + DATASET_NAME + '.mat')
@@ -48,19 +51,30 @@ for (session_features, session_targets) in \
             try:
                 exp_targets.append(block_targets / baseline_scores)
                 exp_features.append(block_features[2:])
+                #exp_ids.append( TODO
             except:
                 continue
-            #exp_ids.append TODO
         else:
             pass
 
 exp_features = np.vstack(exp_features)
 exp_targets = np.vstack(exp_targets)
- 
-inds = exp_features[:,0]<6
-exp_targets = exp_targets[inds,:3].max(axis=1).reshape(-1,1)
-exp_features = exp_features[inds]
+
+# manual feature transforms
 exp_features[:,2] = np.log(exp_features[:,2])
+exp_targets = exp_targets[:,:3].max(axis=1).reshape(-1,1)
+
+# anomality removal
+fe = np.hstack([exp_features,exp_targets])
+fe_mean = np.mean(fe, axis=0)
+fe_std = np.std(fe, axis=0)
+fe_dev = np.sum(((fe - fe_mean)/fe_std)**2, axis=1)/fe.shape[1]
+inds = (fe_dev < 1.0)
+
+#exp_ids = exp_ids[inds]
+exp_targets = exp_targets[inds]
+exp_features = exp_features[inds]
+
 # apply threshold
 #exp_targets_classes = (exp_targets[:,TARGET] > SCORE_THRESHOLD).astype(np.int)
 exp_targets_classes = (exp_targets > SCORE_THRESHOLD).astype(np.int)
@@ -142,8 +156,12 @@ if ANALYSIS_CLASSIFICATION:
 
     
     # train and test classifier
-    supervised_learning.classify_svm(features=exp_features, 
-            targets=exp_targets_classes)
+    if LEARNER == 'knn':
+        supervised_learning.classify_knn(features=exp_features, 
+                targets=exp_targets_classes)
+    elif LEARNER == 'svm':
+        supervised_learning.classify_svm(features=exp_features, 
+                targets=exp_targets_classes)
 
 plt.tight_layout()
 plt.draw()
