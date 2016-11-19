@@ -10,6 +10,7 @@ import scipy.io
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
+import sklearn.datasets
 
 import supervised_learning
 
@@ -21,9 +22,12 @@ ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
 TARGET = None # FIXME
+
+LOAD_TEST_DATA = False
+
 SCORE_THRESHOLD = 1.4
 
-LEARNER = 'svm'
+LEARNER = 'svr'# knn, svm, svr
 
 
 # load dataset file
@@ -63,17 +67,20 @@ exp_targets = np.vstack(exp_targets)
 # manual feature transforms
 exp_features[:,2] = np.log(exp_features[:,2])
 exp_targets = exp_targets[:,:3].max(axis=1).reshape(-1,1)
+#exp_targets = exp_targets[:,0].reshape(-1,1)
 
 # anomality removal
 fe = np.hstack([exp_features,exp_targets])
 fe_mean = np.mean(fe, axis=0)
 fe_std = np.std(fe, axis=0)
 fe_dev = np.sum(((fe - fe_mean)/fe_std)**2, axis=1)/fe.shape[1]
-inds = (fe_dev < 1.0)
+inds = (fe_dev < 1.0) * (exp_targets.ravel() < 2.0) * \
+        (exp_targets.ravel() > 0.8)
 
 #exp_ids = exp_ids[inds]
 exp_targets = exp_targets[inds]
 exp_features = exp_features[inds]
+
 
 # apply threshold
 #exp_targets_classes = (exp_targets[:,TARGET] > SCORE_THRESHOLD).astype(np.int)
@@ -136,23 +143,27 @@ if ANALYSIS_VISUALIZATION:
     plt.title('Score is indicated by color')
 
 
-
+if LOAD_TEST_DATA:
+    exp_features, exp_targets = sklearn.datasets.load_diabetes(True)
+        
 
 if ANALYSIS_CLASSIFICATION:
-    # visualize score classes on exp data
-    x = exp_features[:,0]
-    y = exp_features[:,1]
-    z = exp_features[:,2]
-    t = exp_targets_classes
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    ax.scatter(x, y, z, c=t, marker='o', cmap=cm.prism)#, cmap=cm.jet)
     
-    ax.set_xlabel('Intensity')
-    ax.set_ylabel('Location')
-    ax.set_zlabel('Frequency')
-    plt.title('Score class is indicated by color')
+    if LEARNER[-1] == 'c':
+        # visualize score classes on exp data
+        x = exp_features[:,0]
+        y = exp_features[:,1]
+        z = exp_features[:,2]
+        t = exp_targets_classes
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.scatter(x, y, z, c=t, marker='o', cmap=cm.prism)#, cmap=cm.jet)
+        
+        ax.set_xlabel('Intensity')
+        ax.set_ylabel('Location')
+        ax.set_zlabel('Frequency')
+        plt.title('Score class is indicated by color')
 
     
     # train and test classifier
@@ -162,6 +173,10 @@ if ANALYSIS_CLASSIFICATION:
     elif LEARNER == 'svm':
         supervised_learning.classify_svm(features=exp_features, 
                 targets=exp_targets_classes)
+    elif LEARNER == 'svr':
+        supervised_learning.regress_svr(features=exp_features, 
+                targets=exp_targets.ravel())
+
 
 plt.tight_layout()
 plt.draw()
