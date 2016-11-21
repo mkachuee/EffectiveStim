@@ -155,6 +155,7 @@ def extract_targets_emg(block_data, debug=False):
     sig_emg = sig_emg[::10]
     
     # preprocess them
+    sig_emg -= sig_emg.mean()
     sig_pulse = np.abs(sig_pulse)
     sig_emg = np.abs(sig_emg)
     
@@ -210,6 +211,8 @@ def extract_targets_emg(block_data, debug=False):
         for part in emg_parts:
             extracted_targets.append(np.median(\
                 np.sort(part)[int(0.95*len(part)):]))
+        for part in emg_parts:
+            extracted_targets.append(np.sum(part))
         #extracted_targets['emg_peak_1'] = np.median(\
         #        np.sort(emg_parts[0])[int(0.95*len(emg_parts[0])):])
         #extracted_targets['emg_peak_2'] = np.median(\
@@ -225,8 +228,8 @@ def extract_targets_emg(block_data, debug=False):
         plt.title('accepted')
         plt.draw()
         print(extracted_targets)
-        #pdb.set_trace()
-        embed()
+        pdb.set_trace()
+        #embed()
 
     return extracted_targets
    
