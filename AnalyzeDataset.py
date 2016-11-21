@@ -21,11 +21,12 @@ DATASET_NAME = sys.argv[1]#'dataset_718885'
 ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
-TARGET = None # FIXME
+TARGET = 'area' # FIXME
+VARIATION_MAX = 1.0
 
 LOAD_TEST_DATA = False
 
-SCORE_THRESHOLD = 1.4
+SCORE_THRESHOLD = 0.4
 
 LEARNER = 'svr'# knn, svm, svr
 
@@ -53,7 +54,9 @@ for (session_features, session_targets) in \
             baseline_scores = block_targets
         elif block_features[1] ==2:
             try:
-                exp_targets.append(block_targets / baseline_scores)
+                #exp_targets.append(block_targets / baseline_scores)
+                exp_targets.append((block_targets-baseline_scores) \
+                        / baseline_scores)
                 exp_features.append(block_features[2:])
                 #exp_ids.append( TODO
             except:
@@ -64,18 +67,34 @@ for (session_features, session_targets) in \
 exp_features = np.vstack(exp_features)
 exp_targets = np.vstack(exp_targets)
 
+# apply variation max
+if TARGET == 'force':
+    exp_targets = exp_targets[:,:3]
+elif TARGET == 'area':    
+    exp_targets = exp_targets[:,3:6]
+else:
+    assert False
+
+tar_var = (np.abs(exp_targets - exp_targets.mean(axis=1).reshape(-1,1)) / \
+        exp_targets.mean(axis=1).reshape(-1,1))
+inds = tar_var.max(axis=1) < VARIATION_MAX
+#exp_ids = exp_ids[inds]
+exp_targets = exp_targets[inds]
+exp_features = exp_features[inds]
+
 # manual feature transforms
 exp_features[:,2] = np.log(exp_features[:,2])
-exp_targets = exp_targets[:,:3].max(axis=1).reshape(-1,1)
-#exp_targets = exp_targets[:,0].reshape(-1,1)
+exp_targets = exp_targets.max(axis=1).reshape(-1,1)
 
 # anomality removal
 fe = np.hstack([exp_features,exp_targets])
 fe_mean = np.mean(fe, axis=0)
 fe_std = np.std(fe, axis=0)
 fe_dev = np.sum(((fe - fe_mean)/fe_std)**2, axis=1)/fe.shape[1]
-inds = (fe_dev < 1.0) * (exp_targets.ravel() < 2.0) * \
-        (exp_targets.ravel() > 0.8)
+
+inds = (fe_dev < 1.0) * (exp_targets.ravel() < 1.0)
+#inds = (fe_dev < 1.0) * (exp_targets.ravel() < 2.0) * \
+#        (exp_targets.ravel() > 0.8)
 
 #exp_ids = exp_ids[inds]
 exp_targets = exp_targets[inds]
@@ -83,16 +102,9 @@ exp_features = exp_features[inds]
 
 
 # apply threshold
-#exp_targets_classes = (exp_targets[:,TARGET] > SCORE_THRESHOLD).astype(np.int)
 exp_targets_classes = (exp_targets > SCORE_THRESHOLD).astype(np.int)
 exp_targets_classes = exp_targets_classes.ravel()
- #exp_targets_classes = (exp_targets[:,3:].max(axis=1) > SCORE_THRESHOLD).astype(np.int)
 
-# some outlier checks
-# FIXME: uncomment after investigation
-#valid_exps = ((exp_targets < 1.6) * (exp_targets > 0.8)).all(axis=1)
-#exp_features = exp_features[valid_exps]
-#exp_targets = exp_targets[valid_exps]
 
 if ANALYSIS_VISUALIZATION:
      
@@ -142,6 +154,20 @@ if ANALYSIS_VISUALIZATION:
     ax.set_zlabel('Frequency')
     plt.title('Score is indicated by color')
 
+    # visualize score classes on exp data
+    x = exp_features[:,0]
+    y = exp_features[:,1]
+    z = exp_features[:,2]
+    t = exp_targets_classes
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.scatter(x, y, z, c=t, marker='o', cmap=cm.prism)#, cmap=cm.jet)
+        
+    ax.set_xlabel('Intensity')
+    ax.set_ylabel('Location')
+    ax.set_zlabel('Frequency')
+    plt.title('Score class is indicated by color')
 
 if LOAD_TEST_DATA:
     exp_features, exp_targets = sklearn.datasets.load_diabetes(True)
@@ -149,28 +175,11 @@ if LOAD_TEST_DATA:
 
 if ANALYSIS_CLASSIFICATION:
     
-    if LEARNER[-1] == 'c':
-        # visualize score classes on exp data
-        x = exp_features[:,0]
-        y = exp_features[:,1]
-        z = exp_features[:,2]
-        t = exp_targets_classes
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        ax.scatter(x, y, z, c=t, marker='o', cmap=cm.prism)#, cmap=cm.jet)
-        
-        ax.set_xlabel('Intensity')
-        ax.set_ylabel('Location')
-        ax.set_zlabel('Frequency')
-        plt.title('Score class is indicated by color')
-
-    
     # train and test classifier
     if LEARNER == 'knn':
         supervised_learning.classify_knn(features=exp_features, 
                 targets=exp_targets_classes)
-    elif LEARNER == 'svm':
+    elif LEARNER == 'svc':
         supervised_learning.classify_svm(features=exp_features, 
                 targets=exp_targets_classes)
     elif LEARNER == 'svr':
