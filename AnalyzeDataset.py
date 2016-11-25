@@ -21,14 +21,16 @@ DATASET_NAME = sys.argv[1]#'dataset_718885'
 ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
-TARGET = 'area' # FIXME
-VARIATION_MAX = 1.0
-
+TARGET = 'force' 
+DIFFERENCE_MAX = 1.5#2.00
+DIFFERENCE_MIN = -0.50
+VARIATION_MAX = 9990.10
+ANOMALITY_MAX = 9991.0
 LOAD_TEST_DATA = False
 
-SCORE_THRESHOLD = 0.4
+SCORE_THRESHOLD = 0.40
 
-LEARNER = 'svr'# knn, svm, svr
+LEARNER = 'svr'# knn, svc, svr
 
 
 # load dataset file
@@ -46,6 +48,7 @@ for (session_features, session_targets) in \
     zip(dataset_features[0], dataset_targets[0]):
     # for each block
     baseline_scores = None
+    #embed() 
     for (block_features, block_targets) in \
         zip(session_features, session_targets):
     # check block type
@@ -67,6 +70,8 @@ for (session_features, session_targets) in \
 exp_features = np.vstack(exp_features)
 exp_targets = np.vstack(exp_targets)
 
+
+
 # apply variation max
 if TARGET == 'force':
     exp_targets = exp_targets[:,:3]
@@ -86,13 +91,20 @@ exp_features = exp_features[inds]
 exp_features[:,2] = np.log(exp_features[:,2])
 exp_targets = exp_targets.max(axis=1).reshape(-1,1)
 
+# apply difference max and min
+inds = ((exp_targets<DIFFERENCE_MAX) * (exp_targets>DIFFERENCE_MIN)).ravel()
+#exp_ids = exp_ids[inds]
+exp_targets = exp_targets[inds]
+exp_features = exp_features[inds]
+
+
 # anomality removal
 fe = np.hstack([exp_features,exp_targets])
 fe_mean = np.mean(fe, axis=0)
 fe_std = np.std(fe, axis=0)
 fe_dev = np.sum(((fe - fe_mean)/fe_std)**2, axis=1)/fe.shape[1]
 
-inds = (fe_dev < 1.0) * (exp_targets.ravel() < 1.0)
+inds = (fe_dev < ANOMALITY_MAX)
 #inds = (fe_dev < 1.0) * (exp_targets.ravel() < 2.0) * \
 #        (exp_targets.ravel() > 0.8)
 
@@ -187,6 +199,6 @@ if ANALYSIS_CLASSIFICATION:
                 targets=exp_targets.ravel())
 
 
-plt.tight_layout()
+#plt.tight_layout()
 plt.draw()
-embed()
+#embed()

@@ -3,6 +3,8 @@ import pdb
 from IPython import embed
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy
+
 import sklearn.preprocessing
 import sklearn.model_selection
 import sklearn.svm
@@ -129,10 +131,20 @@ def regress_svr(features, targets,
             decimals=4)
     accuracy_null = np.around((np.abs(test_targets-test_targets.mean())).mean(), 
             decimals=4)
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+            test_targets,test_predictions) 
     print('MAE is: ' + str(accuracy))
     print('Null MAE is: ' + str(accuracy_null))
     if DEBUG:
         plt.figure()
         plt.plot(test_targets,test_predictions, 'o')
+        reg_range = np.linspace(np.min(test_targets), 
+                np.max(test_targets), 100)
+        plt.plot(reg_range,reg_range, '.')
+        plt.plot(reg_range, r_value*reg_range+intercept)
+        plt.xlabel('Target')
+        plt.ylabel('Prediction')
+        plt.title('r = '+str(np.around(r_value, 2)))
+        plt.axis('equal')
         embed()
 
