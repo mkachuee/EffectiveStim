@@ -100,9 +100,13 @@ def regress_svr(features, targets,
         params= [
             {
             'kernel': ['rbf'],
-            'C': 10.0**np.arange(-1,3,0.5), 
-            'gamma': 10.0**np.arange(-2,1,0.5),
-            'epsilon': 10.0**np.arange(-2,1,0.5)
+            'C': 10.0**np.linspace(0,3,20),#arange(-1,3,0.5), 
+            'gamma': 10.0**np.linspace(-4,-1,20),#arange(-2,1,0.5),
+            'epsilon': 10.0**np.linspace(-4,-2,20),#arange(-2,1,0.5)
+            #'kernel': ['rbf'],
+            #'C': 10.0**np.arange(-1,3,0.5), 
+            #'gamma': 10.0**np.arange(-2,1,0.5),
+            #'epsilon': 10.0**np.arange(-2,1,0.5)
             }, 
             #{
             #'kernel': ['poly'],
