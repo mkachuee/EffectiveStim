@@ -48,20 +48,27 @@ for (session_features, session_targets) in \
     zip(dataset_features[0], dataset_targets[0]):
     # for each block
     baseline_scores = None
-    #embed() 
     for (block_features, block_targets) in \
         zip(session_features, session_targets):
     # check block type
     # if it is baseline
         if block_features[1] == 1:
-            baseline_scores = block_targets
+            base_inds = (session_features[:,2:]==block_features[2:]).all(axis=1)
+            baseline_scores = np.median(session_targets[base_inds],axis=0)
+            #baseline_scores = block_targets
         elif block_features[1] ==2:
             try:
-                #exp_targets.append(block_targets / baseline_scores)
-                exp_targets.append((block_targets-baseline_scores) \
-                        / baseline_scores)
-                exp_features.append(block_features[2:])
-                #exp_ids.append( TODO
+                #embed()
+                if not np.all((block_features[2:]==exp_features),axis=-1).any():
+                    conf_inds = (session_features[:,2:] == \
+                            block_features[2:]).all(axis=1)
+                    #pdb.set_trace()
+                    block_targets = np.median(session_targets[conf_inds],axis=0)
+                    #exp_targets.append(block_targets / baseline_scores)
+                    exp_targets.append((block_targets-baseline_scores) \
+                            / baseline_scores)
+                    exp_features.append(block_features[2:])
+                    #exp_ids.append( TODO
             except:
                 continue
         else:
