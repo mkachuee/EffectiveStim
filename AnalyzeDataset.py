@@ -24,7 +24,7 @@ ANALYSIS_CLASSIFICATION = True
 TARGET = 'force' 
 DIFFERENCE_MAX = 1.5#2.00
 DIFFERENCE_MIN = -0.50
-VARIATION_MAX = 9990.10
+VARIATION_MAX = 9991.10
 ANOMALITY_MAX = 9991.0
 LOAD_TEST_DATA = False
 
@@ -44,12 +44,12 @@ exp_features = [] # it would be list of [Intensity, Location, Frequency]
 exp_targets = []
 exp_ids = []
 # for each session
-for (session_features, session_targets) in \
-    zip(dataset_features[0], dataset_targets[0]):
+for (session_features, session_targets, session_names) in \
+    zip(dataset_features[0], dataset_targets[0], dataset_sessions[0]):
     # for each block
     baseline_scores = None
-    for (block_features, block_targets) in \
-        zip(session_features, session_targets):
+    for (block_features, block_targets, block_name) in \
+        zip(session_features, session_targets, session_names):
     # check block type
     # if it is baseline
         if block_features[1] == 1:
@@ -68,7 +68,7 @@ for (session_features, session_targets) in \
                     exp_targets.append((block_targets-baseline_scores) \
                             / baseline_scores)
                     exp_features.append(block_features[2:])
-                    #exp_ids.append( TODO
+                    exp_ids.append(block_name)
             except:
                 continue
         else:
@@ -76,7 +76,7 @@ for (session_features, session_targets) in \
 
 exp_features = np.vstack(exp_features)
 exp_targets = np.vstack(exp_targets)
-
+exp_ids = np.vstack(exp_ids)
 
 
 # apply variation max
@@ -90,7 +90,7 @@ else:
 tar_var = (np.abs(exp_targets - exp_targets.mean(axis=1).reshape(-1,1)) / \
         exp_targets.mean(axis=1).reshape(-1,1))
 inds = tar_var.max(axis=1) < VARIATION_MAX
-#exp_ids = exp_ids[inds]
+exp_ids = exp_ids[inds]
 exp_targets = exp_targets[inds]
 exp_features = exp_features[inds]
 
@@ -100,7 +100,7 @@ exp_targets = exp_targets.max(axis=1).reshape(-1,1)
 
 # apply difference max and min
 inds = ((exp_targets<DIFFERENCE_MAX) * (exp_targets>DIFFERENCE_MIN)).ravel()
-#exp_ids = exp_ids[inds]
+exp_ids = exp_ids[inds]
 exp_targets = exp_targets[inds]
 exp_features = exp_features[inds]
 
@@ -115,12 +115,12 @@ inds = (fe_dev < ANOMALITY_MAX)
 #inds = (fe_dev < 1.0) * (exp_targets.ravel() < 2.0) * \
 #        (exp_targets.ravel() > 0.8)
 
-#exp_ids = exp_ids[inds]
+exp_ids = exp_ids[inds]
 exp_targets = exp_targets[inds]
 exp_features = exp_features[inds]
 
 
-# apply threshold
+# apply the class threshold
 exp_targets_classes = (exp_targets > SCORE_THRESHOLD).astype(np.int)
 exp_targets_classes = exp_targets_classes.ravel()
 
@@ -203,7 +203,7 @@ if ANALYSIS_CLASSIFICATION:
                 targets=exp_targets_classes)
     elif LEARNER == 'svr':
         supervised_learning.regress_svr(features=exp_features, 
-                targets=exp_targets.ravel())
+                targets=exp_targets.ravel(), ids=exp_ids)
 
 
 #plt.tight_layout()

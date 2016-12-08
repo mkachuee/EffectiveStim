@@ -35,21 +35,9 @@ for note_file in note_files:
     session_name = note_file.split('/')[-1].split('.')[-2]
     print('Processing: ' + session_name)
     
-    if session_name in ['718885_2016-09-15_week73_HG19']:
+    if session_name in ['718885_2016-09-15_week73_HG19', '718885_2016-07-12_week64_HG1']:
         print('Processing :' + session_name + '... SKIPPED')
         continue
-    
-    #if session_name in ['718885_2016-07-28_week66_HG5','718885_2016-09-22_week74_HG21']:
-    #        '718885_2016-08-10_week68_HG8', '718885_2016-07-15_week64_HG3', 
-    #        '718885_2016-09-01_week71_HG15', '718885_2016-09-29_week75_HG23', 
-    #        '718885_2016-08-17_week69_HG10', '718885_2016-07-27_week66_HG4',
-    #        '718885_2016-09-08_week72_HG17', '718885_2016-08-04_week67_HG7', 
-    #        '718885_2016-07-12_week64_HG1', '718885_2016-09-07_week72_HG16', 
-    #        '718885_2016-09-15_week73_HG19', '718885_2016-08-11_week68_HG9', 
-    #        '718885_2016-08-18_week69_HG11', '718885_2016-07-14_week64_HG2', 
-    #        '718885_2016-08-03_week67_HG6']:
-    #    print('Processing :' + session_name + '... SKIPPED')
-    #     continue
     
 
     #if session_name in ['718885_2016-07-28_week66_HG5','718885_2016-09-22_week74_HG21',
@@ -89,11 +77,10 @@ for note_file in note_files:
         # extract target values from the block
         print('Processing: ' + session_name + ' ' +block_name)
         if TARGET_SIGNAL == 'mvc':
-            session_target = process_block.extract_targets_mvc(block_data)#, debug=True)
+            session_target = process_block.extract_targets_mvc(block_data, debug=False)
         else:
-            session_target = process_block.extract_targets_emg(block_data)#, debug=True)
-        #try:
-        #    #session_target = process_block.extract_targets(block_data, debug=True)
+            session_target = process_block.extract_targets_emg(block_data, debug=False)
+        
         if session_target is None:
             print('WARNING: extract target failed.')
             continue

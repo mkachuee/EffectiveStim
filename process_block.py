@@ -148,8 +148,7 @@ def extract_targets_emg(block_data, debug=False):
     sig_pulse = block_data['ADC_ 1.tev']
     ind_s = int(len(sig_pulse)*0.2)
     ind_e = int(len(sig_pulse)*0.8)
-    sig_emg = block_data['sev'][0]
-
+    sig_emg = block_data['sev'][2]
     # decimate them
     sig_pulse = sig_pulse[::10]
     sig_emg = sig_emg[::10]
