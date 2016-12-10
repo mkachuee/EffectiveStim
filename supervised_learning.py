@@ -100,9 +100,9 @@ def regress_svr(features, targets, ids,
         params= [
             {
             'kernel': ['rbf'],
-            'C': 10.0**np.linspace(0,2,20),#arange(-1,3,0.5), 
-            'gamma': 10.0**np.linspace(-3,-1,20),#arange(-2,1,0.5),
-            'epsilon': 10.0**np.linspace(-4,-2,20),#arange(-2,1,0.5)
+            'C': 10.0**np.linspace(0,2,10), 
+            'gamma': 10.0**np.linspace(-3,-1,10),
+            'epsilon': 10.0**np.linspace(-4,-2,10),
             #'kernel': ['rbf'],
             #'C': 10.0**np.arange(-1,3,0.5), 
             #'gamma': 10.0**np.arange(-2,1,0.5),
@@ -116,7 +116,8 @@ def regress_svr(features, targets, ids,
             #'degree': np.arange(2,5,1)
             #}
             ], 
-        n_folds=10):
+        n_folds=10, 
+        debug=False):
     # random permutation
     ind_perms = np.random.permutation(features.shape[0])
     features = features[ind_perms]
@@ -134,7 +135,7 @@ def regress_svr(features, targets, ids,
     for ind_train, ind_test in kf.split(targets):
         # create a cross validated model for each fold
         clf = sklearn.model_selection.GridSearchCV(sklearn.svm.SVR(), params, 
-                verbose=1, n_jobs=8, cv=n_folds)
+                verbose=0, n_jobs=8, cv=n_folds)
         clf.fit(features[ind_train], targets[ind_train])
         test_predictions.append(clf.predict(features[ind_test]))
         test_targets.append(targets[ind_test])
@@ -145,13 +146,21 @@ def regress_svr(features, targets, ids,
     test_ids = np.vstack(test_ids)
     mae = np.around((np.abs(test_targets-test_predictions)).mean(), 
             decimals=4)
+    std = np.around(np.std(test_targets-test_predictions), 
+            decimals=4)
     mae_null = np.around((np.abs(test_targets-test_targets.mean())).mean(), 
+            decimals=4)
+    std_null = np.around(np.std(test_targets-test_targets.mean()), 
             decimals=4)
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
             test_targets,test_predictions) 
-    print('MAE is: ' + str(mae))
-    print('Null MAE is: ' + str(mae_null))
-    if DEBUG:
+    if debug:
+        print('MAE is: ' + str(mae))
+        print('Null MAE is: ' + str(mae_null))
+        print('STD is: ' + str(std))
+        print('Null STD is: ' + str(std_null))
+        print('r is: ' + str(r_value))
+        #print('Null r is: ' + str(r_value_null))
         plt.figure()
         plt.plot(test_targets,test_predictions, 'o')
         reg_range = np.linspace(np.min(test_targets), 
@@ -161,7 +170,49 @@ def regress_svr(features, targets, ids,
         plt.xlabel('Target')
         plt.ylabel('Prediction')
         plt.title('r = '+str(np.around(r_value, 2)) + \
-                '\n MAE = '+str(mae))
+                '\n MAE = '+str(100*mae) + ', STD= '+str(100*std))
         plt.axis('equal')
         embed()
+    
+    return {'r_value':r_value, 'MAE':mae, 'STD':std}
+
+
+def regress_exp(features, targets, ids, 
+        #params={'kernel': ['linear'],'C': 10.0**np.arange(-18,18,4)}, 
+        params= [
+            {
+            'kernel': ['rbf'],
+            'C': 10.0**np.linspace(0,2,10), 
+            'gamma': 10.0**np.linspace(-3,-1,10),
+            'epsilon': 10.0**np.linspace(-4,-2,10),
+            #'kernel': ['rbf'],
+            #'C': 10.0**np.arange(-1,3,0.5), 
+            #'gamma': 10.0**np.arange(-2,1,0.5),
+            #'epsilon': 10.0**np.arange(-2,1,0.5)
+            }, 
+            #{
+            #'kernel': ['poly'],
+            #'C': 10.0**np.arange(-1,3,1), 
+            #'gamma': 10.0**np.arange(-2,1,1),
+            #'epsilon': 10.0**np.arange(-2,1,1),
+            #'degree': np.arange(2,5,1)
+            #}
+            ], 
+        n_folds=10):
+    
+
+    # calc initial prediction value
+    pred = np.median(targets, axis=1)
+    # targets * theta = pred, theta?
+    theta = np.linalg.lstsq(targets, pred)[0]
+    pred_new = (targets.dot(theta.reshape(-1,1))) 
+    # create a model to predict theta using norm_scores(s)
+
+    # use the model to train a pred estimator
+    # use new pred to calc new theta
+    # repeat!
+
+
+
+    embed()
 
