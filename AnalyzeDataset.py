@@ -202,10 +202,10 @@ if ANALYSIS_CLASSIFICATION:
         supervised_learning.classify_svm(features=exp_features, 
                 targets=exp_targets_classes)
     elif LEARNER == 'svr':
-        supervised_learning.regress_svr(features=exp_features, 
+        accu = supervised_learning.regress_svr(features=exp_features, 
                 targets=exp_targets.ravel(), ids=exp_ids)
 
 
 #plt.tight_layout()
 plt.draw()
-#embed()
+embed()

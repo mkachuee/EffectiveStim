@@ -32,7 +32,7 @@ LOAD_TEST_DATA = False
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'gsearch_exp'# knn, svc, svr
+LEARNER = 'lsearch_expsel' #'gsearch_expsel'
 
 
 # load dataset file
@@ -131,10 +131,21 @@ if LOAD_TEST_DATA:
 if ANALYSIS_CLASSIFICATION:
     
     # train and test
-    if LEARNER == 'exp':
-        parameter_search.lsearch_expsel(features=exp_features, 
+    if LEARNER == 'lsearch_expsel':
+        theta = parameter_search.lsearch_expsel(features=exp_features, 
                 targets=exp_targets, ids=exp_ids)
-    elif LEARNER == 'gsearch_exp':
+        accuracies = []
+        for ind_trntst in range(20):
+            accu = supervised_learning.regress_svr(features=exp_features, 
+                    targets=exp_targets.dot(theta).ravel(), 
+                    ids=exp_ids, debug=False)
+            accuracies.append(accu)
+        accu_mean = {}
+        for k in accuracies[0].keys():
+            accu_mean[k] = np.mean([a[k] for a in accuracies]) 
+        print(accu_mean)
+        embed()
+    elif LEARNER == 'gsearch_expsel':
         parameter_search.gsearch_expsel(features=exp_features, 
                 targets=exp_targets, ids=exp_ids)
     elif LEARNER == 'svr_fast':

@@ -56,19 +56,23 @@ def lsearch_expsel(features, targets, ids,
     """
     #TODO
     """
+    termination_count = 15
+    scoring = 'r_value'
+    score_best = -1
     # calc the initial value
     if theta_0 is None:
         theta_0 = (1.0/features.shape[1]) * np.ones((features.shape[1],1), dtype=np.float)
 
     theta = theta_0
     
-    iter_tot = 1
+    iter_tot = 0
+    cnt_term = 0
     while iter_tot<iter_max or iter_max==-1:
-        print('Local param search iter <'+str(iter_tot)+'> :')
         iter_tot += 1
+        print('Local param search iter # '+str(iter_tot)+'  :')
         
         # get successors
-        successors = find_successors(theta, delta=1.0e-2)
+        successors = find_successors(theta, delta=1.0e-1)
 
         # for each successor
         scores = []
@@ -79,19 +83,33 @@ def lsearch_expsel(features, targets, ids,
             # train and evaluate an estimator using the new target
             accu = supervised_learning.regress_svr(features=features, 
                 targets=targets_trans.ravel(), ids=ids, 
-                params={'kernel':['linear'], 
-                    'C':10.0**np.linspace(0,2,10)}, n_folds=10)
+                params={'kernel': ['rbf'], 'C': 10.0**np.linspace(0,2,5),
+                    'gamma': 10.0**np.linspace(-3,-1,5),
+                    'epsilon': 10.0**np.linspace(-4,-2,5)}, n_folds=10)
+                #{'kernel':['linear'], 
+                #    'C':10.0**np.linspace(0,2,10)}, n_folds=10)
             # store score and theta_succ pair
             scores.append((accu, succ))
         
         # pick the best score theta, and update
-        scores.sort(key=lambda k: k[0]['MAE'])
-        theta = scores[0][1]
-        #embed()
+        scores.sort(key=lambda k: k[0][scoring])
+        scores = scores[::-1]
+        if scores[0][0][scoring] > score_best:
+            cnt_term = 0
+            theta = scores[0][1]
+            score_best = scores[0][0][scoring]
+        else:
+            cnt_term += 1
+        
+        if cnt_term == termination_count:
+            break
         # check termination conditions
         print('Theta optimum is: '+str(theta.flatten().tolist()))
-        print('    score = '+str(scores[0][0]['MAE']))
+        print('    '+scoring+' score = '+str(scores[0][0][scoring]))
+        print('    cnt_term = '+str(cnt_term)+' / '+str(termination_count))
+        print('-'*40)
 
+    #embed()
     return theta
 
 def find_successors(theta, delta):
