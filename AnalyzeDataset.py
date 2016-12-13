@@ -30,7 +30,7 @@ LOAD_TEST_DATA = False
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'svr'# knn, svc, svr
+LEARNER = 'active_svr'# knn, svc, svr
 
 
 # load dataset file
@@ -96,10 +96,11 @@ exp_features = exp_features[inds]
 
 # manual feature transforms
 exp_features[:,2] = np.log(exp_features[:,2])
-exp_targets = exp_targets.max(axis=1).reshape(-1,1)
+# exp_targets = exp_targets.max(axis=1).reshape(-1,1)
+exp_targets_max = exp_targets.max(axis=1).reshape(-1,1)
 
 # apply difference max and min
-inds = ((exp_targets<DIFFERENCE_MAX) * (exp_targets>DIFFERENCE_MIN)).ravel()
+inds = ((exp_targets_max<DIFFERENCE_MAX) * (exp_targets_max>DIFFERENCE_MIN)).ravel()
 exp_ids = exp_ids[inds]
 exp_targets = exp_targets[inds]
 exp_features = exp_features[inds]
@@ -204,8 +205,24 @@ if ANALYSIS_CLASSIFICATION:
     elif LEARNER == 'svr':
         accu = supervised_learning.regress_svr(features=exp_features, 
                 targets=exp_targets.ravel(), ids=exp_ids)
+    elif LEARNER == 'active_svr':
+        theta = [0.6567, 0.2227, 0.1205]
+        exp_targets = exp_targets.dot(np.vstack(theta))
+        accuracies = []
+        for _ in range(10):
+            accu = supervised_learning.regress_active_svr(
+                    features=exp_features, 
+                    targets=exp_targets.ravel(), ids=exp_ids, 
+                    initial_portion=0.33, final_portion=0.99, 
+                    debug=False)
 
+            accuracies.append(accu)
+        accu_mean = {}
+        for k in accuracies[0].keys():
+            accu_mean[k] = np.mean([a[k] for a in accuracies])
+        print(accu_mean)
+        embed()
 
 #plt.tight_layout()
 plt.draw()
-embed()
+#embed()

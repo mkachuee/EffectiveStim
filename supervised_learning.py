@@ -176,6 +176,94 @@ def regress_svr(features, targets, ids,
     
     return {'r_value':r_value, 'MAE':mae, 'STD':std}
 
+def regress_active_svr(features, targets, ids, 
+        #params={'kernel': ['linear'],'C': 10.0**np.arange(-18,18,4)}, 
+        params= [
+            {
+            'kernel': ['rbf'],
+            'C': 10.0**np.linspace(0,2,5), 
+            'gamma': 10.0**np.linspace(-3,-1,5),
+            'epsilon': 10.0**np.linspace(-4,-2,5),
+            }], 
+        n_folds=10, 
+        initial_portion = 0.25, final_portion = 0.50, 
+        debug=True):
+    # random permutation
+    ind_perms = np.random.permutation(features.shape[0])
+    features = features[ind_perms]
+    targets = targets[ind_perms]
+    ids = ids[ind_perms]
+    # normalize features
+    scaler = sklearn.preprocessing.StandardScaler()
+    features = scaler.fit_transform(features)
+    
+    # to k fold test and training
+    test_ids = []
+    test_targets = []
+    test_predictions = []
+    kf = sklearn.model_selection.KFold(n_splits=n_folds)
+    for ind_train, ind_test in kf.split(targets):
+        # create a cross validated model for each fold
+        clf = sklearn.model_selection.GridSearchCV(sklearn.svm.SVR(), params, 
+                verbose=0, n_jobs=8, cv=n_folds)
+        
+        # train set known indexes
+        inds_known = []
+
+        # select a random set of samples to start
+        inds_known = ind_train[:int(len(ind_train)*initial_portion)].tolist()
+        
+        while final_portion > float(len(inds_known))/len(ind_train):
+            # add new samples to known set
+            inds_unknown = list(set(ind_train.tolist()).difference(inds_known))
+            inds_request = inds_unknown[0]
+            inds_known += [inds_request]
+            # update the model
+            clf.fit(features[inds_known], targets[inds_known])
+            # display stat
+            print('Current portion is: ' + \
+                    str(float(len(inds_known))/len(ind_train)))
+
+
+        test_predictions.append(clf.predict(features[ind_test]))
+        test_targets.append(targets[ind_test])
+        test_ids.append(ids[ind_test])
+    # evaluate the model
+    test_targets = np.hstack(test_targets)
+    test_predictions = np.hstack(test_predictions)
+    test_ids = np.vstack(test_ids)
+    mae = np.around((np.abs(test_targets-test_predictions)).mean(), 
+            decimals=4)
+    std = np.around(np.std(test_targets-test_predictions), 
+            decimals=4)
+    mae_null = np.around((np.abs(test_targets-test_targets.mean())).mean(), 
+            decimals=4)
+    std_null = np.around(np.std(test_targets-test_targets.mean()), 
+            decimals=4)
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+            test_targets,test_predictions) 
+    if debug:
+        print('MAE is: ' + str(mae))
+        print('Null MAE is: ' + str(mae_null))
+        print('STD is: ' + str(std))
+        print('Null STD is: ' + str(std_null))
+        print('r is: ' + str(r_value))
+        #print('Null r is: ' + str(r_value_null))
+        plt.figure()
+        plt.plot(test_targets,test_predictions, 'o')
+        reg_range = np.linspace(np.min(test_targets), 
+                np.max(test_targets), 100)
+        plt.plot(reg_range,reg_range, '.')
+        plt.plot(reg_range, r_value*reg_range+intercept)
+        plt.xlabel('Target')
+        plt.ylabel('Prediction')
+        plt.title('r = '+str(np.around(r_value, 2)) + \
+                '\n MAE = '+str(100*mae) + ', STD= '+str(100*std))
+        plt.axis('equal')
+        embed()
+    
+    return {'r_value':r_value, 'MAE':mae, 'STD':std}
+
 
 def regress_exp(features, targets, ids, 
         #params={'kernel': ['linear'],'C': 10.0**np.arange(-18,18,4)}, 
