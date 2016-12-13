@@ -209,14 +209,21 @@ if ANALYSIS_CLASSIFICATION:
         theta = [0.6567, 0.2227, 0.1205]
         exp_targets = exp_targets.dot(np.vstack(theta))
         accuracies = []
-        for _ in range(10):
+        #for _ in range(10):
+        def trn_eval():
             accu = supervised_learning.regress_active_svr(
                     features=exp_features, 
                     targets=exp_targets.ravel(), ids=exp_ids, 
-                    initial_portion=0.33, final_portion=0.99, 
+                    initial_portion=0.25, final_portion=0.99, 
                     debug=False)
+            return accu
 
-            accuracies.append(accu)
+            #accuracies.append(accu)
+        import multiprocessing
+        pool = multiprocessing.Pool(8)
+        
+        accuracies = [pool.apply_async(trn_eval) for _ in range(8)]
+        accuracies = [a.get() for a in accuracies]
         accu_mean = {}
         for k in accuracies[0].keys():
             accu_mean[k] = np.mean([a[k] for a in accuracies])

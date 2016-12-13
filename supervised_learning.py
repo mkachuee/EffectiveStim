@@ -189,6 +189,7 @@ def regress_active_svr(features, targets, ids,
         initial_portion = 0.25, final_portion = 0.50, 
         debug=True):
     # random permutation
+    np.random.seed()
     ind_perms = np.random.permutation(features.shape[0])
     features = features[ind_perms]
     targets = targets[ind_perms]
@@ -204,8 +205,10 @@ def regress_active_svr(features, targets, ids,
     kf = sklearn.model_selection.KFold(n_splits=n_folds)
     for ind_train, ind_test in kf.split(targets):
         # create a cross validated model for each fold
-        clf = sklearn.model_selection.GridSearchCV(sklearn.svm.SVR(), params, 
-                verbose=0, n_jobs=8, cv=n_folds)
+        rgr_commitee = [\
+            sklearn.model_selection.GridSearchCV(sklearn.svm.SVR(), 
+                params, verbose=0, n_jobs=1, cv=n_folds)
+            for _ in range(5)]
         
         # train set known indexes
         inds_known = []
@@ -216,16 +219,35 @@ def regress_active_svr(features, targets, ids,
         while final_portion > float(len(inds_known))/len(ind_train):
             # add new samples to known set
             inds_unknown = list(set(ind_train.tolist()).difference(inds_known))
-            inds_request = inds_unknown[0]
-            inds_known += [inds_request]
-            # update the model
-            clf.fit(features[inds_known], targets[inds_known])
+            # update the models
+            for rgr in rgr_commitee:
+                inds_known_bag = np.random.choice(inds_known, 
+                        size=len(inds_known), replace=True)
+                rgr.fit(features[inds_known_bag], targets[inds_known_bag])
+            
+            # decide on which samples to ask
+            preds_commitee = []
+            for rgr in rgr_commitee:
+                preds_commitee.append(rgr.predict(features[inds_unknown]))
+            
+            # terminate if necessary
+            preds_commitee_std = np.vstack(preds_commitee).std(axis=0)
+            inds_request_order = [inds_unknown[r] for r in \
+                    np.argsort(preds_commitee_std)[::-1]]
+            inds_request = inds_request_order[:5]
+            #inds_request = inds_unknown[np.argsort(preds_commitee_std)[::-1]]
+            inds_known += inds_request
+            
             # display stat
             print('Current portion is: ' + \
                     str(float(len(inds_known))/len(ind_train)))
 
-
-        test_predictions.append(clf.predict(features[ind_test]))
+        # TODO: ADD commitee prediction
+        preds_commitee = []
+        for rgr in rgr_commitee:
+            preds_commitee.append(rgr.predict(features[ind_test]))
+        preds_commitee_mean = np.vstack(preds_commitee).mean(axis=0)
+        test_predictions.append(preds_commitee_mean)
         test_targets.append(targets[ind_test])
         test_ids.append(ids[ind_test])
     # evaluate the model
