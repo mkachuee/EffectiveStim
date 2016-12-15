@@ -203,18 +203,30 @@ if ANALYSIS_CLASSIFICATION:
         supervised_learning.classify_svm(features=exp_features, 
                 targets=exp_targets_classes)
     elif LEARNER == 'svr':
+        theta = [0.6567, 0.2227, 0.1205]
+        exp_targets = exp_targets.dot(np.vstack(theta))
         accu = supervised_learning.regress_svr(features=exp_features, 
-                targets=exp_targets.ravel(), ids=exp_ids)
+                targets=exp_targets.ravel(), ids=exp_ids, debug=True)
     elif LEARNER == 'active_svr':
         theta = [0.6567, 0.2227, 0.1205]
         exp_targets = exp_targets.dot(np.vstack(theta))
         accuracies = []
+        
+        """
+        accu = supervised_learning.regress_active_svr(
+                features=exp_features, 
+                targets=exp_targets.ravel(), ids=exp_ids, 
+                initial_portion=0.20, final_portion=0.99, 
+                debug=False)
+        embed()
+        """
         #for _ in range(10):
-        def trn_eval():
+        def trn_eval(criteria, seed):
             accu = supervised_learning.regress_active_svr(
                     features=exp_features, 
                     targets=exp_targets.ravel(), ids=exp_ids, 
-                    initial_portion=0.25, final_portion=0.99, 
+                    initial_portion=0.20, final_portion=0.99, 
+                    criteria = criteria, seed=seed, 
                     debug=False)
             return accu
 
@@ -222,13 +234,45 @@ if ANALYSIS_CLASSIFICATION:
         import multiprocessing
         pool = multiprocessing.Pool(8)
         
-        accuracies = [pool.apply_async(trn_eval) for _ in range(8)]
+        accuracies = [pool.apply_async(trn_eval, ('commitee',seed))\
+                for seed in range(16)]
+
         accuracies = [a.get() for a in accuracies]
         accu_mean = {}
         for k in accuracies[0].keys():
-            accu_mean[k] = np.mean([a[k] for a in accuracies])
-        print(accu_mean)
+            accu_k = [a[k] for a in accuracies]
+            accu_mean[k] = np.vstack(accu_k).mean(axis=0)
+        
+        accuracies = [pool.apply_async(trn_eval, ('rand',seed))\
+                for seed in range(16)]
+        accuracies = [a.get() for a in accuracies]
+        accu_mean_rand = {}
+        for k in accuracies[0].keys():
+            accu_k = [a[k] for a in accuracies]
+            accu_mean_rand[k] = np.vstack(accu_k).mean(axis=0)
+        
+        plt.ion()
+        plt.figure()
+        plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'k')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value']                ,'k--')
+        plt.xlabel('portions')
+        plt.ylabel('r_value')
+        plt.figure()
+        plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'k')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'], 
+                'k--')
+        plt.xlabel('portions')
+        plt.ylabel('MAE')
+        plt.figure()
+        plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'k')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'], 
+                'k--')
+        plt.xlabel('portions')
+        plt.ylabel('STD')
+        plt.ion()
+        plt.draw()
         embed()
+        
 
 #plt.tight_layout()
 plt.draw()

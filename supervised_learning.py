@@ -100,13 +100,13 @@ def regress_svr(features, targets, ids,
         params= [
             {
             'kernel': ['rbf'],
-            'C': 10.0**np.linspace(0,2,10), 
-            'gamma': 10.0**np.linspace(-3,-1,10),
-            'epsilon': 10.0**np.linspace(-4,-2,10),
+            'C': 10.0**np.linspace(0,2,3), 
+            'gamma': 10.0**np.linspace(-2,-1,3),
+            'epsilon': 10.0**np.linspace(-2,-1,3),
             #'kernel': ['rbf'],
-            #'C': 10.0**np.arange(-1,3,0.5), 
-            #'gamma': 10.0**np.arange(-2,1,0.5),
-            #'epsilon': 10.0**np.arange(-2,1,0.5)
+            #'C': 10.0**np.linspace(0,2,10), 
+            #'gamma': 10.0**np.linspace(-3,-1,10),
+            #'epsilon': 10.0**np.linspace(-4,-2,10),
             }, 
             #{
             #'kernel': ['poly'],
@@ -181,15 +181,20 @@ def regress_active_svr(features, targets, ids,
         params= [
             {
             'kernel': ['rbf'],
-            'C': 10.0**np.linspace(0,2,5), 
-            'gamma': 10.0**np.linspace(-3,-1,5),
-            'epsilon': 10.0**np.linspace(-4,-2,5),
+            'C': 10.0**np.linspace(0,2,3), 
+            'gamma': 10.0**np.linspace(-2,-1,3),
+            'epsilon': 10.0**np.linspace(-2,-1,3),
+            #'kernel': ['rbf'],
+            #'C': 10.0**np.linspace(0,2,5), 
+            #'gamma': 10.0**np.linspace(-3,-1,5),
+            #'epsilon': 10.0**np.linspace(-4,-2,5),
             }], 
-        n_folds=10, 
-        initial_portion = 0.25, final_portion = 0.50, 
+        n_folds=10, criteria = 'commitee', seed= None,  
+        initial_portion = 0.25, final_portion = 0.50,
+        step_size=1, 
         debug=True):
     # random permutation
-    np.random.seed()
+    np.random.seed(seed)
     ind_perms = np.random.permutation(features.shape[0])
     features = features[ind_perms]
     targets = targets[ind_perms]
@@ -203,22 +208,33 @@ def regress_active_svr(features, targets, ids,
     test_targets = []
     test_predictions = []
     kf = sklearn.model_selection.KFold(n_splits=n_folds)
+    accuracy_portions = []
+    fold_cnt = 1
     for ind_train, ind_test in kf.split(targets):
+        print(79*'-')
+        print('fold: '+str(fold_cnt))
+        fold_cnt += 1
         # create a cross validated model for each fold
         rgr_commitee = [\
             sklearn.model_selection.GridSearchCV(sklearn.svm.SVR(), 
                 params, verbose=0, n_jobs=1, cv=n_folds)
-            for _ in range(5)]
+            for _ in range(16)]
         
         # train set known indexes
         inds_known = []
 
         # select a random set of samples to start
         inds_known = ind_train[:int(len(ind_train)*initial_portion)].tolist()
-        
-        while final_portion > float(len(inds_known))/len(ind_train):
+        accu_portions = []  
+        current_portion = 0.0
+        while final_portion > current_portion:
+            #
+            current_portion = float(len(inds_known))/len(ind_train)
+            
             # add new samples to known set
             inds_unknown = list(set(ind_train.tolist()).difference(inds_known))
+            if len(inds_unknown) == 0:
+                break
             # update the models
             for rgr in rgr_commitee:
                 inds_known_bag = np.random.choice(inds_known, 
@@ -234,58 +250,74 @@ def regress_active_svr(features, targets, ids,
             preds_commitee_std = np.vstack(preds_commitee).std(axis=0)
             inds_request_order = [inds_unknown[r] for r in \
                     np.argsort(preds_commitee_std)[::-1]]
-            inds_request = inds_request_order[:5]
-            #inds_request = inds_unknown[np.argsort(preds_commitee_std)[::-1]]
+            
+            if criteria != 'rand':
+                inds_request = inds_request_order[:step_size]
+                #inds_request = inds_unknown[np.argsort(preds_commitee_std)[::-1]]
+            else:
+                if len(inds_unknown) >= step_size:
+                    inds_request = np.random.choice(inds_unknown, 
+                            size=step_size, replace=False).tolist()
+                else:
+                    inds_request = np.random.choice(inds_unknown, 
+                            size=len(inds_unknown),replace=False).tolist()
+
             inds_known += inds_request
             
             # display stat
-            print('Current portion is: ' + \
-                    str(float(len(inds_known))/len(ind_train)))
+            print(40*'-')
+            print('Portion: ' + str(current_portion))
 
-        # TODO: ADD commitee prediction
-        preds_commitee = []
-        for rgr in rgr_commitee:
-            preds_commitee.append(rgr.predict(features[ind_test]))
-        preds_commitee_mean = np.vstack(preds_commitee).mean(axis=0)
-        test_predictions.append(preds_commitee_mean)
-        test_targets.append(targets[ind_test])
-        test_ids.append(ids[ind_test])
-    # evaluate the model
-    test_targets = np.hstack(test_targets)
-    test_predictions = np.hstack(test_predictions)
-    test_ids = np.vstack(test_ids)
-    mae = np.around((np.abs(test_targets-test_predictions)).mean(), 
-            decimals=4)
-    std = np.around(np.std(test_targets-test_predictions), 
-            decimals=4)
-    mae_null = np.around((np.abs(test_targets-test_targets.mean())).mean(), 
-            decimals=4)
-    std_null = np.around(np.std(test_targets-test_targets.mean()), 
-            decimals=4)
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
-            test_targets,test_predictions) 
-    if debug:
-        print('MAE is: ' + str(mae))
-        print('Null MAE is: ' + str(mae_null))
-        print('STD is: ' + str(std))
-        print('Null STD is: ' + str(std_null))
-        print('r is: ' + str(r_value))
-        #print('Null r is: ' + str(r_value_null))
-        plt.figure()
-        plt.plot(test_targets,test_predictions, 'o')
-        reg_range = np.linspace(np.min(test_targets), 
-                np.max(test_targets), 100)
-        plt.plot(reg_range,reg_range, '.')
-        plt.plot(reg_range, r_value*reg_range+intercept)
-        plt.xlabel('Target')
-        plt.ylabel('Prediction')
-        plt.title('r = '+str(np.around(r_value, 2)) + \
-                '\n MAE = '+str(100*mae) + ', STD= '+str(100*std))
-        plt.axis('equal')
-        embed()
+            preds_commitee = []
+            for rgr in rgr_commitee:
+                preds_commitee.append(rgr.predict(features[ind_test]))
+            preds_commitee_mean = np.vstack(preds_commitee).mean(axis=0)
+            test_predictions = preds_commitee_mean
+            test_targets = targets[ind_test]
+            test_ids = ids[ind_test]
+
+            # evaluate the model
+            test_targets = np.hstack(test_targets)
+            test_predictions = np.hstack(test_predictions)
+            test_ids = np.vstack(test_ids)
+            mae = np.around((np.abs(test_targets-test_predictions)).mean(), 
+                    decimals=4)
+            std = np.around(np.std(test_targets-test_predictions), 
+                    decimals=4)
+            mae_null = np.around((np.abs(test_targets-test_targets.mean())).mean(), 
+                    decimals=4)
+            std_null = np.around(np.std(test_targets-test_targets.mean()), 
+                decimals=4)
+            slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+                test_targets,test_predictions)
+            accu_portions.append({'r_value':r_value, 'MAE':mae, 'STD':std, 
+                'portion':current_portion})
+            print('Performance: ' + str(accu_portions[-1]))
+        # add portion accuracies for this fold
+        accuracy_portions.append(accu_portions)
     
-    return {'r_value':r_value, 'MAE':mae, 'STD':std}
-
+    portions = [a['portion'] for a in accuracy_portions[0]]
+    portions_mae = []
+    portions_std = []
+    portions_r_value = []
+    for portion in portions:
+        maes = []
+        stds = []
+        r_values = []
+        for fold in accuracy_portions:
+            for step in fold:
+                if step['portion'] == portion:
+                    maes.append(step['MAE'])
+                    stds.append(step['STD'])
+                    r_values.append(step['r_value'])
+                    
+        portions_mae.append(np.mean(maes))
+        portions_std.append(np.mean(stds))
+        portions_r_value.append(np.mean(r_values))
+        
+    
+    return {'portions_mae':portions_mae, 'portions_std':portions_std, 
+            'portions_r_value':portions_r_value, 'portions':portions} 
 
 def regress_exp(features, targets, ids, 
         #params={'kernel': ['linear'],'C': 10.0**np.arange(-18,18,4)}, 
