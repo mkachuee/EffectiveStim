@@ -177,21 +177,16 @@ def regress_svr(features, targets, ids,
     return {'r_value':r_value, 'MAE':mae, 'STD':std}
 
 def regress_active_svr(features, targets, ids, 
-        #params={'kernel': ['linear'],'C': 10.0**np.arange(-18,18,4)}, 
         params= [
             {
             'kernel': ['rbf'],
             'C': 10.0**np.linspace(0,2,3), 
             'gamma': 10.0**np.linspace(-2,-1,3),
             'epsilon': 10.0**np.linspace(-2,-1,3),
-            #'kernel': ['rbf'],
-            #'C': 10.0**np.linspace(0,2,5), 
-            #'gamma': 10.0**np.linspace(-3,-1,5),
-            #'epsilon': 10.0**np.linspace(-4,-2,5),
             }], 
-        n_folds=10, criteria = 'commitee', seed= None,  
+        n_folds=5, criteria = 'committee', seed= None,  
         initial_portion = 0.25, final_portion = 0.50,
-        step_size=1, 
+        step_size=3, 
         debug=True):
     # random permutation
     np.random.seed(seed)
@@ -203,7 +198,7 @@ def regress_active_svr(features, targets, ids,
     scaler = sklearn.preprocessing.StandardScaler()
     features = scaler.fit_transform(features)
     
-    # to k fold test and training
+    # k fold test and training
     test_ids = []
     test_targets = []
     test_predictions = []
@@ -218,7 +213,7 @@ def regress_active_svr(features, targets, ids,
         rgr_commitee = [\
             sklearn.model_selection.GridSearchCV(sklearn.svm.SVR(), 
                 params, verbose=0, n_jobs=1, cv=n_folds)
-            for _ in range(16)]
+            for _ in range(8)]
         
         # train set known indexes
         inds_known = []
@@ -226,44 +221,44 @@ def regress_active_svr(features, targets, ids,
         # select a random set of samples to start
         inds_known = ind_train[:int(len(ind_train)*initial_portion)].tolist()
         accu_portions = []  
-        current_portion = 0.0
+        current_portion = float(len(inds_known))/len(ind_train)
         while final_portion > current_portion:
             #
             current_portion = float(len(inds_known))/len(ind_train)
             
             # add new samples to known set
             inds_unknown = list(set(ind_train.tolist()).difference(inds_known))
-            if len(inds_unknown) == 0:
-                break
             # update the models
             for rgr in rgr_commitee:
                 inds_known_bag = np.random.choice(inds_known, 
-                        size=len(inds_known), replace=True)
+                        size=int(len(inds_known)*0.8), replace=True)
                 rgr.fit(features[inds_known_bag], targets[inds_known_bag])
             
-            # decide on which samples to ask
-            preds_commitee = []
-            for rgr in rgr_commitee:
-                preds_commitee.append(rgr.predict(features[inds_unknown]))
+            if len(inds_unknown) != 0:
+                # decide on which samples to ask
+                preds_commitee = []
+                for rgr in rgr_commitee:
+                    preds_commitee.append(rgr.predict(features[inds_unknown]))
             
-            # terminate if necessary
-            preds_commitee_std = np.vstack(preds_commitee).std(axis=0)
-            inds_request_order = [inds_unknown[r] for r in \
-                    np.argsort(preds_commitee_std)[::-1]]
-            
-            if criteria != 'rand':
-                inds_request = inds_request_order[:step_size]
-                #inds_request = inds_unknown[np.argsort(preds_commitee_std)[::-1]]
-            else:
-                if len(inds_unknown) >= step_size:
-                    inds_request = np.random.choice(inds_unknown, 
-                            size=step_size, replace=False).tolist()
+                # calculate committee variance
+                preds_commitee = np.vstack(preds_commitee)
+                preds_commitee_norm = preds_commitee/preds_commitee.max(axis=0)
+                preds_commitee_std = np.vstack(preds_commitee_norm).std(axis=0)
+                inds_request_order = [inds_unknown[r] for r in \
+                        np.argsort(preds_commitee_std)[::-1]]
+                
+                # find best request while preserving random state
+                inds_request_rand = np.random.choice(inds_unknown, 
+                        size=min(len(inds_unknown),step_size),
+                        replace=False).tolist()
+                inds_request_comm = inds_request_order[:step_size]
+                if criteria == 'committee':
+                    inds_request = inds_request_comm
+                elif criteria == 'rand':
+                    inds_request = inds_request_rand
                 else:
-                    inds_request = np.random.choice(inds_unknown, 
-                            size=len(inds_unknown),replace=False).tolist()
-
-            inds_known += inds_request
-            
+                    raise NameError('Unknown AL criteria')
+                inds_known += inds_request
             # display stat
             print(40*'-')
             print('Portion: ' + str(current_portion))
@@ -275,7 +270,6 @@ def regress_active_svr(features, targets, ids,
             test_predictions = preds_commitee_mean
             test_targets = targets[ind_test]
             test_ids = ids[ind_test]
-
             # evaluate the model
             test_targets = np.hstack(test_targets)
             test_predictions = np.hstack(test_predictions)
@@ -295,7 +289,11 @@ def regress_active_svr(features, targets, ids,
             print('Performance: ' + str(accu_portions[-1]))
         # add portion accuracies for this fold
         accuracy_portions.append(accu_portions)
-    
+        #if fold_cnt == 2:
+        #    print('A'*80)
+        #    print(accuracy_portions)
+        #    pdb.set_trace()
+
     portions = [a['portion'] for a in accuracy_portions[0]]
     portions_mae = []
     portions_std = []
@@ -306,11 +304,11 @@ def regress_active_svr(features, targets, ids,
         r_values = []
         for fold in accuracy_portions:
             for step in fold:
-                if step['portion'] == portion:
+                if np.abs(step['portion']-portion) < 0.02:
+                #if step['portion'] == portion:
                     maes.append(step['MAE'])
                     stds.append(step['STD'])
                     r_values.append(step['r_value'])
-                    
         portions_mae.append(np.mean(maes))
         portions_std.append(np.mean(stds))
         portions_r_value.append(np.mean(r_values))
