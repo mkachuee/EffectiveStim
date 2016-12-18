@@ -218,14 +218,14 @@ if ANALYSIS_CLASSIFICATION:
             accu = supervised_learning.regress_active_svr(
                     features=exp_features, 
                     targets=exp_targets.ravel(), ids=exp_ids, 
-                    initial_portion=0.35, final_portion=1.00, 
+                    initial_portion=0.15, final_portion=1.00, 
                     criteria = criteria, seed=seed, 
                     debug=False)
             return accu
 
             #accuracies.append(accu)
         pool = multiprocessing.Pool(8)
-        runs = 8 
+        runs = 40 
         accuracies = [pool.apply_async(trn_eval, ('committee',seed))\
                 for seed in range(runs)]
 
@@ -247,22 +247,22 @@ if ANALYSIS_CLASSIFICATION:
         plt.figure()
         plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'k')
         plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'ok')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'b')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'ob')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'k--')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'^k')
         plt.xlabel('portions')
         plt.ylabel('r_value')
         plt.figure()
         plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'k')
         plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'ok')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'b')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'ob')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'k--')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'^k')
         plt.xlabel('portions')
         plt.ylabel('MAE')
         plt.figure()
         plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'k')
         plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'ok')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'b')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'ob')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'k--')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'^k')
         plt.xlabel('portions')
         plt.ylabel('STD')
         plt.ion()

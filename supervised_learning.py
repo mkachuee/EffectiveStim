@@ -186,7 +186,7 @@ def regress_active_svr(features, targets, ids,
             }], 
         n_folds=5, criteria = 'committee', seed= None,  
         initial_portion = 0.25, final_portion = 0.50,
-        step_size=3, 
+        step_size=2, 
         debug=True):
     # random permutation
     np.random.seed(seed)
