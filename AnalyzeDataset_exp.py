@@ -14,7 +14,7 @@ import sklearn.datasets
 
 import supervised_learning
 import parameter_search
-
+import learning.trn_simple_regression 
 
 plt.ion()
 
@@ -32,7 +32,7 @@ LOAD_TEST_DATA = False
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'lsearch_expsel' #'gsearch_expsel'
+LEARNER = 'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
 
 
 # load dataset file
@@ -97,9 +97,9 @@ exp_features = exp_features[inds]
 
 # manual feature transforms
 exp_features[:,2] = np.log(exp_features[:,2])
-#FIXME: here, median works better!
-#xp_targets = exp_targets.max(axis=1).reshape(-1,1)
-#exp_targets = np.median(exp_targets, axis=1).reshape(-1,1)
+# NOTE: here, median works better!
+# exp_targets = exp_targets.max(axis=1).reshape(-1,1)
+# exp_targets = np.median(exp_targets, axis=1).reshape(-1,1)
 exp_targets = exp_targets
 
 
@@ -153,6 +153,9 @@ if ANALYSIS_CLASSIFICATION:
                 targets=exp_targets.max(axis=1), ids=exp_ids, 
                 params={'kernel':['linear'], 'C':10.0**np.linspace(0,2,10)}, 
                 n_folds=10)
+    elif LEARNER == 'nn_expsel':
+        learning.trn_simple_regression.run_training(\
+                (exp_features,exp_targets[:,0])) 
     else:
         raise ValueError('Invalid LEARNER')
 
