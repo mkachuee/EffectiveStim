@@ -23,6 +23,7 @@ import argparse
 import os
 import sys
 import time
+import pdb
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
@@ -32,9 +33,9 @@ import learning.nn_simple_regression as nn
 # parameters
 N_FE = 3
 SIZE_BATCH = 72
-SIZE_HIDDENS = [5]
-RATE_LEARNING = 0.0001
-MAX_STEPS = 10000
+SIZE_HIDDENS = [5,5]
+RATE_LEARNING = 0.01
+MAX_STEPS = 100000
 DIR_LOG = './logs'
 
 os.system('rm -r '+DIR_LOG)
@@ -56,7 +57,7 @@ def placeholder_inputs(batch_size):
   # rather than the full size of the train or test data sets.
   features_placeholder = tf.placeholder(tf.float32, shape=(batch_size,
                                                          N_FE))
-  targets_placeholder = tf.placeholder(tf.float32, shape=(batch_size))
+  targets_placeholder = tf.placeholder(tf.float32, shape=(batch_size,1))
   return features_placeholder, targets_placeholder
 
 
@@ -170,7 +171,6 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
       feed_dict = fill_feed_dict(dataset_trn,
                                  features_placeholder,
                                  targets_placeholder)
-
       # Run one step of the model.  The return values are the activations
       # from the `train_op` (which is discarded) and the `loss` Op.  To
       # inspect the values of your Ops or variables, you may include them
@@ -191,7 +191,8 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
         summary_writer.flush()
 
       # Save a checkpoint and evaluate the model periodically.
-      if (step + 1) % 1000 == 0 or (step + 1) == MAX_STEPS:
+      if (step + 1) % 10000 == 0 or (step + 1) == MAX_STEPS:
+        
         checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
         saver.save(sess, checkpoint_file, global_step=step)
         # Evaluate against the training set.
@@ -200,6 +201,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
                 features_placeholder, targets_placeholder)
         accu = sess.run(eval_model, feed_dict=feed_dict)
         print(accu)
+        
         """
         # Evaluate against the validation set.
         print('Validation Data Eval:')

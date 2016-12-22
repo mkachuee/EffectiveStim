@@ -154,8 +154,13 @@ if ANALYSIS_CLASSIFICATION:
                 params={'kernel':['linear'], 'C':10.0**np.linspace(0,2,10)}, 
                 n_folds=10)
     elif LEARNER == 'nn_expsel':
+        theta = [0.6567, 0.2227, 0.1205]
+        exp_targets = exp_targets.dot(np.vstack(theta))
+        #exp_features = np.random.rand(72*3).reshape((-1,3))
+        #exp_targets = exp_features[:,0].reshape(-1,1)
+        
         learning.trn_simple_regression.run_training(\
-                (exp_features,exp_targets[:,0])) 
+                (exp_features,exp_targets)) 
     else:
         raise ValueError('Invalid LEARNER')
 

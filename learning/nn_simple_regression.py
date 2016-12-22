@@ -58,16 +58,30 @@ def inference(features, hidden_units):
         name='weights')
     biases = tf.Variable(tf.zeros([hidden_units[0]]),
                          name='biases')
-    hidden1 = tf.nn.relu(tf.matmul(features, weights) + biases)
+    hidden = tf.nn.sigmoid(tf.matmul(features, weights) + biases)
+  
+  cnt_hid=1
+  for unit_hid in hidden_units[1:]:
+    cnt_hid += 1
+    with tf.name_scope('hidden'+str(cnt_hid)):
+        weights = tf.Variable(
+                tf.truncated_normal([int(hidden.get_shape()[1]), unit_hid],
+                            stddev=1.0 / math.sqrt(float(N_FE))),
+                name='weights')
+        biases = tf.Variable(tf.zeros([unit_hid]),
+                         name='biases')
+        hidden = tf.nn.sigmoid(tf.matmul(hidden, weights) + biases)
+
+  
   # output
-  with tf.name_scope('hidden2'):
+  with tf.name_scope('output'):
     weights = tf.Variable(
-        tf.truncated_normal([hidden_units[0], 1],
-                            stddev=1.0 / math.sqrt(float(hidden_units[0]))),
+        tf.truncated_normal([hidden_units[-1], 1],
+                            stddev=1.0 / math.sqrt(float(hidden_units[-1]))),
         name='weights')
     biases = tf.Variable(tf.zeros([1]),
                          name='biases')
-    preds = tf.matmul(hidden1, weights) + biases
+    preds = tf.matmul(hidden, weights) + biases
     
   return preds
 
@@ -77,8 +91,8 @@ def loss(preds, targets):
   """
   cost_mse = (targets-preds)**2
   loss = tf.reduce_mean(cost_mse, name='cost_mse')
+  
   return loss
-
 
 def training(loss, learning_rate):
   """Sets up the training Ops.
