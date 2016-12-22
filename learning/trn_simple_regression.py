@@ -1,17 +1,3 @@
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
 
 """Trains and Evaluates the MNIST network using a feed dictionary."""
 from __future__ import absolute_import
@@ -26,16 +12,23 @@ import time
 import pdb
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
+import numpy as np
+import scipy
+import sklearn
 import tensorflow as tf
+from IPython import embed
+import matplotlib.pyplot as plt
+
 import learning.nn_simple_regression as nn
 
 
 # parameters
 N_FE = 3
-SIZE_BATCH = 72
-SIZE_HIDDENS = [5,5]
+SIZE_BATCH = None
+SIZE_HIDDENS = [8,8]
 RATE_LEARNING = 0.01
-MAX_STEPS = 100000
+MAX_STEPS = 1000000
+MAX_EARLYSTOP = 5
 DIR_LOG = './logs'
 
 os.system('rm -r '+DIR_LOG)
@@ -123,7 +116,16 @@ def do_eval(sess,
 
 def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
   """Train nn for a number of steps."""
-
+  # if we don't have any val data, select it from trn
+  if not dataset_val:
+    portion_val = 0.20  
+    n_trn = dataset_trn[0].shape[0]
+    inds_val = np.random.choice(n_trn, int(n_trn*portion_val), replace=False)
+    dataset_val = (dataset_trn[0][inds_val],dataset_trn[1][inds_val])
+    mask = np.ones(dataset_trn[0].shape[0], dtype=bool)
+    mask[inds_val]=False
+    dataset_trn = (dataset_trn[0][mask,:],dataset_trn[1][mask,:])
+  
   # Tell TensorFlow that the model will be built into the default Graph.
   with tf.Graph().as_default():
     # Generate placeholders for the images and labels.
@@ -155,7 +157,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     sess = tf.Session()
 
     # Instantiate a SummaryWriter to output summaries and the Graph.
-    summary_writer = tf.summary.FileWriter(DIR_LOG, sess.graph)
+    #summary_writer = tf.summary.FileWriter(DIR_LOG, sess.graph)
 
     # And then after everything is built:
 
@@ -163,6 +165,9 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     sess.run(init)
 
     # Start the training loop.
+    max_early_stop = MAX_EARLYSTOP
+    cnt_early_stop = 0
+    previous_loss = 0.0
     for step in xrange(MAX_STEPS):
       start_time = time.time()
 
@@ -180,42 +185,116 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
                                feed_dict=feed_dict)
 
       duration = time.time() - start_time
-
+      
       # Write the summaries and print an overview fairly often.
       if step % 100 == 0:
         # Print status to stdout.
         print('Step %d: loss = %.4f (%.3f sec)' % (step, loss_value, duration))
         # Update the events file.
-        summary_str = sess.run(summary, feed_dict=feed_dict)
-        summary_writer.add_summary(summary_str, step)
-        summary_writer.flush()
+        #summary_str = sess.run(summary, feed_dict=feed_dict)
+        #summary_writer.add_summary(summary_str, step)
+        #summary_writer.flush()
 
       # Save a checkpoint and evaluate the model periodically.
-      if (step + 1) % 10000 == 0 or (step + 1) == MAX_STEPS:
+      if (step + 1) % 100 == 0 or (step + 1) == MAX_STEPS:
         
-        checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
-        saver.save(sess, checkpoint_file, global_step=step)
+        #checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
+        #saver.save(sess, checkpoint_file, global_step=step)
         # Evaluate against the training set.
         print('Training Data Eval:')
         feed_dict = fill_feed_dict(dataset_trn, 
                 features_placeholder, targets_placeholder)
         accu = sess.run(eval_model, feed_dict=feed_dict)
         print(accu)
-        
-        """
         # Evaluate against the validation set.
-        print('Validation Data Eval:')
-        do_eval(sess,
-                eval_mae,
-                features_placeholder,
-                targets_placeholder,
-                dataset_val)
-        # Evaluate against the test set.
+        if dataset_val:
+            print('Validation Data Eval:')
+            feed_dict = fill_feed_dict(dataset_val, 
+                    features_placeholder, targets_placeholder)
+            accu = sess.run(eval_model, feed_dict=feed_dict)
+            print(accu)
+            # update early stop and terminate, if necessary
+            if accu['MAE'] > previous_loss:
+                cnt_early_stop += 1
+            else:
+                cnt_early_stop = 0
+            if cnt_early_stop > max_early_stop:
+                break
+            previous_loss = accu['MAE']
+            print('Eearly Stop counter: '+\
+                    str(cnt_early_stop)+'/'+str(max_early_stop))
+    # Evaluate against the test set.
+    if dataset_tst:
         print('Test Data Eval:')
-        do_eval(sess,
-                eval_mae,
-                features_placeholder,
-                targets_placeholder,
-                dataset_tst)
-        """
+        feed_dict = fill_feed_dict(dataset_tst, 
+                features_placeholder, targets_placeholder)
+        accu = sess.run(eval_model, feed_dict=feed_dict)
+        preds_tst = sess.run(preds, feed_dict=feed_dict)
+        print(accu)
+        return preds_tst
 
+def regress_nn(features, targets, ids, params=None, 
+        debug=False, n_folds=10, seed=None):
+    """
+    n-fold train and test.
+    """
+    # random permutation
+    np.random.seed(seed)
+    ind_perms = np.random.permutation(features.shape[0])
+    features = features[ind_perms]
+    targets = targets[ind_perms]
+    ids = ids[ind_perms]
+    # normalize features
+    scaler = sklearn.preprocessing.StandardScaler()
+    features = scaler.fit_transform(features)
+    
+    # to k fold test and traini
+    test_ids = []
+    test_targets = []
+    test_predictions = []
+    kf = sklearn.model_selection.KFold(n_splits=n_folds)
+    for ind_train, ind_test in kf.split(targets):
+        # create a cross validated model for each fold
+        dataset_trn = (features[ind_train],targets[ind_train])
+        dataset_tst = (features[ind_test],targets[ind_test])
+        preds_test = run_training(dataset_trn=dataset_trn, 
+                dataset_tst=dataset_tst)
+        
+        test_predictions.append(preds_test)
+        test_targets.append(targets[ind_test])
+        test_ids.append(ids[ind_test])
+    # evaluate the model
+    test_targets = np.vstack(test_targets)
+    test_predictions = np.vstack(test_predictions)
+    test_ids = np.vstack(test_ids)
+    mae = np.around((np.abs(test_targets-test_predictions)).mean(), 
+            decimals=4)
+    std = np.around(np.std(test_targets-test_predictions), 
+            decimals=4)
+    mae_null = np.around((np.abs(test_targets-test_targets.mean())).mean(), 
+            decimals=4)
+    std_null = np.around(np.std(test_targets-test_targets.mean()), 
+            decimals=4)
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+            test_targets.transpose(),test_predictions.transpose()) 
+    if debug:
+        print('MAE is: ' + str(mae))
+        print('Null MAE is: ' + str(mae_null))
+        print('STD is: ' + str(std))
+        print('Null STD is: ' + str(std_null))
+        print('r is: ' + str(r_value))
+        #print('Null r is: ' + str(r_value_null))
+        plt.figure()
+        plt.plot(test_targets,test_predictions, 'o')
+        reg_range = np.linspace(np.min(test_targets), 
+                np.max(test_targets), 100)
+        plt.plot(reg_range,reg_range, '.')
+        plt.plot(reg_range, r_value*reg_range+intercept)
+        plt.xlabel('Target')
+        plt.ylabel('Prediction')
+        plt.title('r = '+str(np.around(r_value, 2)) + \
+                '\n MAE = '+str(100*mae) + ', STD= '+str(100*std))
+        plt.axis('equal')
+        embed()
+    
+    return {'r_value':r_value, 'MAE':mae, 'STD':std}

@@ -159,11 +159,23 @@ if ANALYSIS_CLASSIFICATION:
         #exp_features = np.random.rand(72*3).reshape((-1,3))
         #exp_targets = exp_features[:,0].reshape(-1,1)
         
-        learning.trn_simple_regression.run_training(\
-                (exp_features,exp_targets)) 
+        dataset_trn = (exp_features,exp_targets)
+        dataset_val = (exp_features,exp_targets)
+        dataset_tst = (exp_features,exp_targets)
+        accu = learning.trn_simple_regression.regress_nn(
+                features=exp_features, 
+                targets=exp_targets, ids=exp_ids, 
+                params=None, 
+                n_folds=10,
+                debug=True, seed=0)
+        #preds_tst = learning.trn_simple_regression.run_training(
+        #        dataset_trn=dataset_trn, 
+        #        dataset_val=dataset_val,
+        #        dataset_tst=dataset_tst
+        #        )
     else:
         raise ValueError('Invalid LEARNER')
 
 #plt.tight_layout()
-plt.draw()
+#plt.draw()
 #embed()
