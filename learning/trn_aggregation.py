@@ -25,11 +25,11 @@ import learning.nn_aggregation as nn
 # parameters
 N_FE = 3
 SIZE_BATCH = None
-SIZE_HIDDENS = [8,8]
-SIZE_HIDDENS_AGG = [2]
+SIZE_HIDDENS = [4,4]
+SIZE_HIDDENS_AGG = [3]
 RATE_LEARNING = 0.01
-MAX_STEPS = 1000000
-MAX_EARLYSTOP = 10
+MAX_STEPS = 100000
+MAX_EARLYSTOP = 5
 DIR_LOG = './logs'
 
 os.system('rm -r '+DIR_LOG)
@@ -166,6 +166,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
       # Write the summaries and print an overview fairly often.
       if step % 100 == 0:
         # Print status to stdout.
+        print('-'*40)
         print('Step %d: loss = %.4f (%.3f sec)' % (step, loss_value, duration))
         # Update the events file.
         #summary_str = sess.run(summary, feed_dict=feed_dict)
@@ -201,6 +202,13 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
             previous_loss = accu['MAE']
             print('Eearly Stop counter: '+\
                     str(cnt_early_stop)+'/'+str(max_early_stop))
+        if dataset_tst:
+            print('Test Data Eval:')
+            feed_dict = fill_feed_dict(dataset_tst, 
+                    features_placeholder, scores_placeholder,
+                    targets_placeholder)
+            accu = sess.run(eval_model, feed_dict=feed_dict)
+            print(accu)
     # Evaluate against the test set.
     if dataset_tst:
         print('Test Data Eval:')
@@ -210,11 +218,10 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
         accu = sess.run(eval_model, feed_dict=feed_dict)
         preds_tst = sess.run(preds, feed_dict=feed_dict)
         agg_preds = sess.run(preds_agg, feed_dict=feed_dict)
-        # FIXME
-        #targets_tst = np.diagonal(
-        #        dataset_tst[1].dot(agg_preds.transpose())).reshape(-1,1)
+        
         targets_tst = np.sum(dataset_tst[1] * agg_preds, axis=1).reshape(-1,1)
         print(accu)
+        #pdb.set_trace()
         return preds_tst, targets_tst
 
 def regress_nn(features, targets, ids, params=None, 

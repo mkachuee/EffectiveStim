@@ -15,6 +15,7 @@ import sklearn.datasets
 import supervised_learning
 import parameter_search
 import learning.trn_simple_regression 
+import learning.trn_aggregation
 
 plt.ion()
 
@@ -32,7 +33,7 @@ LOAD_TEST_DATA = False
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
+LEARNER = 'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
 
 
 # load dataset file
@@ -159,20 +160,23 @@ if ANALYSIS_CLASSIFICATION:
         #exp_features = np.random.rand(72*3).reshape((-1,3))
         #exp_targets = exp_features[:,0].reshape(-1,1)
         
-        dataset_trn = (exp_features,exp_targets)
-        dataset_val = (exp_features,exp_targets)
-        dataset_tst = (exp_features,exp_targets)
         accu = learning.trn_simple_regression.regress_nn(
                 features=exp_features, 
                 targets=exp_targets, ids=exp_ids, 
                 params=None, 
                 n_folds=10,
                 debug=True, seed=0)
-        #preds_tst = learning.trn_simple_regression.run_training(
-        #        dataset_trn=dataset_trn, 
-        #        dataset_val=dataset_val,
-        #        dataset_tst=dataset_tst
-        #        )
+    elif LEARNER == 'nn_agg':
+        # FIXME
+        #theta = [0.6567, 0.2227, 0.1205]
+        #exp_targets = exp_targets.dot(np.vstack(theta))
+        #exp_targets = np.matlib.repmat(exp_targets, 1,3)
+        accu = learning.trn_aggregation.regress_nn(
+                features=exp_features, 
+                targets=exp_targets, ids=exp_ids, 
+                params=None, 
+                n_folds=10,
+                debug=True, seed=None)
     else:
         raise ValueError('Invalid LEARNER')
 

@@ -93,18 +93,18 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
     weights = tf.Variable(
         tf.truncated_normal([hidden_units_agg[-1], 3],
                             stddev=1.0 / math.sqrt(float(hidden_units_agg[-1]))),
-        name='weights', trainable=False)
+        name='weights')
 
-    #weights_tmp = tf.zeros([hidden_units_agg[-1], 3])
 
-    biases = tf.Variable(tf.zeros([1])+0.33,
-                         name='biases', trainable=False)
+    biases = tf.Variable(tf.zeros([1]), name='biases')
 
-    #biases_tmp = tf.zeros([1])+0.33
     agg_preds =  tf.nn.softmax(tf.matmul(hidden, weights) + biases)
 
   
   #agg_preds_mean = tf.ones([tf.shape(preds)[0], 3], dtype=tf.float32) / 3.0
+  t_tmp = tf.ones([tf.shape(preds)[0], 1], dtype=tf.float32)
+  agg_preds_0 = tf.reshape(tf.stack([t_tmp*0.7,t_tmp*0.2,t_tmp*0.1], axis=1),
+          (-1,3))
 
   return preds, agg_preds
 
@@ -112,17 +112,7 @@ def loss(preds, agg_preds, targets):
   """
   Calculates the loss.
   """
-  #agg_targets = tf.diag_part(tf.matmul(targets, tf.transpose(agg_preds)))
-  #cost_mse = (agg_targets-preds)**2
-  
-  #cost_mse = (tf.matmul(targets,tf.constant([1.0,0.0,0.0],shape=(3,1))) -preds)**2
-  #pdb.set_trace()
-  #agg_targets = tf.reduce_sum((tf.matmul(targets,tf.transpose(agg_preds))) \
-  #  * tf.eye(tf.shape(targets)[0]), axis=1)
-  #agg_targets = tf.diag_part(tf.matmul(targets,tf.transpose(agg_preds)))
-  #agg_targets = tf.reduce_sum(targets * agg_preds, axis=1)
   agg_targets = tf.reshape(tf.reduce_sum(targets * agg_preds, axis=1),(-1,1))
-  #pdb.set_trace()
   cost_mse = (agg_targets - preds) ** 2
   loss = tf.reduce_mean(cost_mse, name='agg_cost_mse')
   return loss
@@ -160,18 +150,8 @@ def evaluation(preds, agg_preds, targets):
   """
   Calculates mse
   """
-  #return {} # FIXME
-  #agg_targets = tf.diag_part(tf.matmul(targets, tf.transpose(agg_preds)))
-  #agg_targets = tf.matmul(targets,tf.constant([1.0,0.0,0.0],shape=(3,1)))
-  #agg_targets = tf.diag_part(tf.matmul(targets,tf.transpose(agg_preds)))
-  #agg_targets = tf.reduce_sum((tf.matmul(targets,tf.transpose(agg_preds))) \
-  #  * tf.eye(tf.shape(targets)[0]), axis=1)
-  #agg_targets = tf.reduce_sum(targets * agg_preds, axis=1)
   agg_targets = tf.reshape(tf.reduce_sum(targets * agg_preds, axis=1),(-1,1))
-  #agg_targets = tf.matmul(targets,tf.transpose(agg_preds))
-  #tf.matmul(targets,tf.constant([1.0, 0.0, 0.0])) #[:,0]
-  err = agg_targets - preds
-  
+  err = agg_targets - preds 
   mae = tf.reduce_mean(tf.abs(err))
   std = tf.sqrt(tf.reduce_mean((err-tf.reduce_mean(err)) ** 2))
   # r_value calculation
