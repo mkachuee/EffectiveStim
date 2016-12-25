@@ -23,11 +23,14 @@ import learning.nn_aggregation as nn
 
 
 # parameters
+DEBUG = False
+
 N_FE = 3
 SIZE_BATCH = None
-SIZE_HIDDENS = [4,4]
-SIZE_HIDDENS_AGG = [3]
+SIZE_HIDDENS = [128,128]
+SIZE_HIDDENS_AGG = [16,16]#[128,128]
 RATE_LEARNING = 0.01
+RATE_LEARNING_AGG = 0.01
 MAX_STEPS = 100000
 MAX_EARLYSTOP = 5
 DIR_LOG = './logs'
@@ -79,10 +82,11 @@ def fill_feed_dict(dataset, features_pl, scores_pl, targets_pl):
   # `batch size` examples.
   # TODO: add batch support
   features_feed = dataset[0]
-  scores_feed = dataset[1] / np.max(dataset[1], axis=1).reshape(-1,1)
-  #scores_feed = np.zeros(dataset[0].shape, float) - 1  dataset[1] / np.max(dataset[1], axis=1).reshape(-1,1)
+  scores_diff = dataset[1] - np.median(dataset[1], axis=1).reshape(-1,1)
+  scores_feed = scores_diff / np.median(dataset[1], axis=1).reshape(-1,1)
+  #scores_feed = dataset[1] / np.max(dataset[1], axis=1).reshape(-1,1)
+  #scores_feed = (scores_feed -scores_feed.mean(axis=0))/  scores_feed.std(0)
   targets_feed = dataset[1]
-  #targets_feed[:,0] = targets_feed.mean(1)
   feed_dict = {
       features_pl: features_feed,
       scores_pl: scores_feed,
@@ -96,6 +100,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
   if not dataset_val:
     portion_val = 0.20  
     n_trn = dataset_trn[0].shape[0]
+    #inds_val = range(int(n_trn*portion_val))
     inds_val = np.random.choice(n_trn, int(n_trn*portion_val), replace=False)
     dataset_val = (dataset_trn[0][inds_val],dataset_trn[1][inds_val])
     mask = np.ones(dataset_trn[0].shape[0], dtype=bool)
@@ -116,7 +121,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     loss = nn.loss(preds, preds_agg, targets_placeholder)
 
     # Add to the Graph the Ops that calculate and apply gradients.
-    train_op = nn.training(loss, RATE_LEARNING)
+    train_op = nn.training(loss, RATE_LEARNING, RATE_LEARNING_AGG)
 
     # Add the Op to compare the logits to the labels during evaluation.
     eval_model = nn.evaluation(preds, preds_agg, targets_placeholder)
@@ -134,7 +139,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     sess = tf.Session()
 
     # Instantiate a SummaryWriter to output summaries and the Graph.
-    #summary_writer = tf.summary.FileWriter(DIR_LOG, sess.graph)
+    summary_writer = tf.summary.FileWriter(DIR_LOG, sess.graph)
 
     # And then after everything is built:
 
@@ -168,10 +173,11 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
         # Print status to stdout.
         print('-'*40)
         print('Step %d: loss = %.4f (%.3f sec)' % (step, loss_value, duration))
-        # Update the events file.
-        #summary_str = sess.run(summary, feed_dict=feed_dict)
-        #summary_writer.add_summary(summary_str, step)
-        #summary_writer.flush()
+        if step % 5000:
+            # Update the events file.
+            summary_str = sess.run(summary, feed_dict=feed_dict)
+            summary_writer.add_summary(summary_str, step)
+            #summary_writer.flush()
 
       # Save a checkpoint and evaluate the model periodically.
       if (step + 1) % 100 == 0 or (step + 1) == MAX_STEPS:
@@ -222,6 +228,9 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
         targets_tst = np.sum(dataset_tst[1] * agg_preds, axis=1).reshape(-1,1)
         print(accu)
         #pdb.set_trace()
+        if DEBUG:
+            print(agg_preds)
+            pdb.set_trace()
         return preds_tst, targets_tst
 
 def regress_nn(features, targets, ids, params=None, 
@@ -230,11 +239,12 @@ def regress_nn(features, targets, ids, params=None,
     n-fold train and test.
     """
     # random permutation
-    np.random.seed(seed)
-    ind_perms = np.random.permutation(features.shape[0])
-    features = features[ind_perms]
-    targets = targets[ind_perms]
-    ids = ids[ind_perms]
+    if seed != -1:
+        np.random.seed(seed)
+        ind_perms = np.random.permutation(features.shape[0])
+        features = features[ind_perms]
+        targets = targets[ind_perms]
+        ids = ids[ind_perms]
     # normalize features
     scaler = sklearn.preprocessing.StandardScaler()
     features = scaler.fit_transform(features)

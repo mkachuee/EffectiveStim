@@ -24,6 +24,7 @@ DATASET_NAME = sys.argv[1]#'dataset_718885'
 ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
+COMBINE_EXPS = False
 TARGET = 'force' 
 DIFFERENCE_MAX = 1.5#2.00
 DIFFERENCE_MIN = -0.50
@@ -46,40 +47,71 @@ dataset_sessions = dataset['dataset_sessions']
 exp_features = [] # it would be list of [Intensity, Location, Frequency]
 exp_targets = []
 exp_ids = []
+
+if COMBINE_EXPS:
+    # for each session
+    for (session_features, session_targets, session_names) in \
+        zip(dataset_features[0], dataset_targets[0], dataset_sessions[0]):
+        # for each block
+        baseline_scores = None
+        for (block_features, block_targets, block_name) in \
+            zip(session_features, session_targets, session_names):
+        # check block type
+        # if it is baseline
+            if block_features[1] == 1:
+                base_inds = (session_features[:,2:]==block_features[2:]).all(axis=1)
+                baseline_scores = np.median(session_targets[base_inds],axis=0)
+                #baseline_scores = block_targets
+            elif block_features[1] ==2:
+                try:
+                    #embed()
+                    if not np.all((block_features[2:]==exp_features),axis=-1).any():
+                        conf_inds = (session_features[:,2:] == \
+                                block_features[2:]).all(axis=1)
+                        block_targets = np.median(session_targets[conf_inds],axis=0)
+                        #exp_targets.append(block_targets / baseline_scores)
+                        exp_targets.append((block_targets-baseline_scores) \
+                                / baseline_scores)
+                        exp_features.append(block_features[2:])
+                        exp_ids.append(block_name)
+                except:
+                    continue
+            else:
+                pass
+else:
 # for each session
-for (session_features, session_targets, session_names) in \
-    zip(dataset_features[0], dataset_targets[0], dataset_sessions[0]):
-    # for each block
-    baseline_scores = None
-    for (block_features, block_targets, block_name) in \
-        zip(session_features, session_targets, session_names):
-    # check block type
-    # if it is baseline
-        if block_features[1] == 1:
-            base_inds = (session_features[:,2:]==block_features[2:]).all(axis=1)
-            baseline_scores = np.median(session_targets[base_inds],axis=0)
-            #baseline_scores = block_targets
-        elif block_features[1] ==2:
-            try:
-                #embed()
-                if not np.all((block_features[2:]==exp_features),axis=-1).any():
-                    conf_inds = (session_features[:,2:] == \
-                            block_features[2:]).all(axis=1)
-                    block_targets = np.median(session_targets[conf_inds],axis=0)
-                    #exp_targets.append(block_targets / baseline_scores)
-                    exp_targets.append((block_targets-baseline_scores) \
-                            / baseline_scores)
-                    exp_features.append(block_features[2:])
-                    exp_ids.append(block_name)
-            except:
-                continue
-        else:
-            pass
+    np.random.seed(None)
+    ind_perms = np.random.permutation(dataset_features[0].shape[0])
+    dataset_features[0] = dataset_features[0][ind_perms]
+    dataset_targets[0] = dataset_targets[0][ind_perms]
+    dataset_sessions[0] = dataset_sessions[0][ind_perms]
+
+    for (session_features, session_targets, session_names) in \
+        zip(dataset_features[0], dataset_targets[0], dataset_sessions[0]):
+        # for each block
+        baseline_scores = None
+        for (block_features, block_targets, block_name) in \
+            zip(session_features, session_targets, session_names):
+        # check block type
+        # if it is baseline
+            if block_features[1] == 1:
+                base_inds = (session_features[:,2:]==block_features[2:]).all(axis=1)
+                baseline_scores = np.median(session_targets[base_inds],axis=0)
+                #baseline_scores = block_targets
+            elif block_features[1] ==2:
+                try:
+                        exp_targets.append((block_targets-baseline_scores) \
+                                / baseline_scores)
+                        exp_features.append(block_features[2:])
+                        exp_ids.append(block_name)
+                except:
+                    continue
+            else:
+                pass
 
 exp_features = np.vstack(exp_features)
 exp_targets = np.vstack(exp_targets)
 exp_ids = np.vstack(exp_ids)
-
 
 # apply variation max
 if TARGET == 'force':
@@ -176,7 +208,7 @@ if ANALYSIS_CLASSIFICATION:
                 targets=exp_targets, ids=exp_ids, 
                 params=None, 
                 n_folds=10,
-                debug=True, seed=None)
+                debug=True, seed=-1)
     else:
         raise ValueError('Invalid LEARNER')
 

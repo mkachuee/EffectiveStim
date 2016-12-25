@@ -99,7 +99,9 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
     biases = tf.Variable(tf.zeros([1]), name='biases')
 
     agg_preds =  tf.nn.softmax(tf.matmul(hidden, weights) + biases)
-
+    #agg_preds_n =  (tf.matmul(hidden, weights) + biases)
+    #agg_preds = tf.div(agg_preds_n,tf.reshape(
+    #    tf.reduce_sum(agg_preds_n, axis=1), (-1,1)))
   
   #agg_preds_mean = tf.ones([tf.shape(preds)[0], 3], dtype=tf.float32) / 3.0
   t_tmp = tf.ones([tf.shape(preds)[0], 1], dtype=tf.float32)
@@ -117,7 +119,7 @@ def loss(preds, agg_preds, targets):
   loss = tf.reduce_mean(cost_mse, name='agg_cost_mse')
   return loss
 
-def training(loss, learning_rate):
+def training(loss, learning_rate, learning_rate_agg):
   """Sets up the training Ops.
 
   Creates a summarizer to track the loss over time in TensorBoard.
@@ -134,16 +136,29 @@ def training(loss, learning_rate):
   Returns:
     train_op: The Op for training.
   """
+  # create variable lists
+  var_list = []
+  var_list_agg = []
+  for tval in tf.trainable_variables():
+    tf.summary.histogram(tval.name, tval)
+    if tval.name[:3] == 'agg':
+      var_list_agg.append(tval)
+    else:
+      var_list.append(tval)
   # Add a scalar summary for the snapshot loss.
   tf.summary.scalar('loss', loss)
   # Create the gradient descent optimizer with the given learning rate.
   optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+  optimizer_agg = tf.train.GradientDescentOptimizer(learning_rate_agg)
   # Create a variable to track the global step.
   global_step = tf.Variable(0, name='global_step', trainable=False)
   # Use the optimizer to apply the gradients that minimize the loss
   # (and also increment the global step counter) as a single training step.
-  train_op = optimizer.minimize(loss, global_step=global_step)
-  return train_op
+  train_op = optimizer.minimize(loss, global_step=global_step, 
+          var_list=var_list)
+  train_op_agg = optimizer_agg.minimize(loss, global_step=global_step, 
+          var_list=var_list_agg)
+  return tf.group(train_op, train_op_agg)
 
 
 def evaluation(preds, agg_preds, targets):
