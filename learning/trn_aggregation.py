@@ -23,45 +23,42 @@ import learning.nn_aggregation as nn
 
 
 # parameters
-DEBUG = False
+DEBUG = 1
 
 N_FE = 3
 SIZE_BATCH = None
-SIZE_HIDDENS = [128,128]
-SIZE_HIDDENS_AGG = [16,16]#[128,128]
-RATE_LEARNING = 0.01
-RATE_LEARNING_AGG = 0.01
+SIZE_HIDDENS = [128,128]#[128,128]
+SIZE_HIDDENS_AGG = [128,128]#[128,128]
+RATE_LEARNING_1 = 1.0e-3
+RATE_LEARNING_AGG_1 = 1.0e-3
+RATE_LEARNING_2 = 1.0e-4
+RATE_LEARNING_AGG_2 = 1.0e-4
 MAX_STEPS = 100000
-MAX_EARLYSTOP = 5
+MAX_EARLYSTOP = 100 #MAX_STEPS# FIXME
 DIR_LOG = './logs'
 
 os.system('rm -r '+DIR_LOG)
 
-def placeholder_inputs(batch_size):
+def placeholder_inputs():
   """Generate placeholder variables to represent the input tensors.
 
   These placeholders are used as inputs by the rest of the model.
 
-  Args:
-    batch_size: The batch size will be baked into both placeholders.
-
-  Returns:
-    features_placeholder: features placeholder.
-    targets_placeholder: targets placeholder.
   """
   # Note that the shapes of the placeholders match the shapes of the full
   # image and label tensors, except the first dimension is now batch_size
   # rather than the full size of the train or test data sets.
-  features_placeholder = tf.placeholder(tf.float32, shape=(batch_size,
+  features_placeholder = tf.placeholder(tf.float32, shape=(None,
                                                          N_FE))
-  scores_placeholder = tf.placeholder(tf.float32, shape=(batch_size,
+  scores_placeholder = tf.placeholder(tf.float32, shape=(None,
                                                          3))
 
-  targets_placeholder = tf.placeholder(tf.float32, shape=(batch_size,3))
+  targets_placeholder = tf.placeholder(tf.float32, shape=(None,3))
   return features_placeholder, scores_placeholder, targets_placeholder
 
 
-def fill_feed_dict(dataset, features_pl, scores_pl, targets_pl):
+def fill_feed_dict(dataset, features_pl, scores_pl, targets_pl, 
+        batch_size=None):
   """Fills the feed_dict for training the given step.
 
   A feed_dict takes the form of:
@@ -80,12 +77,19 @@ def fill_feed_dict(dataset, features_pl, scores_pl, targets_pl):
   """
   # Create the feed_dict for the placeholders filled with the next
   # `batch size` examples.
-  # TODO: add batch support
+  if batch_size != None:
+    if batch_size < 1.0:
+      batch_size = int(batch_size*dataset[0].shape[0])
+    inds = np.random.choice(dataset[0].shape[0], batch_size, replace=False)
+    dataset = (dataset[0][inds], dataset[1][inds])
+
+  
   features_feed = dataset[0]
   scores_diff = dataset[1] - np.median(dataset[1], axis=1).reshape(-1,1)
   scores_feed = scores_diff / np.median(dataset[1], axis=1).reshape(-1,1)
   #scores_feed = dataset[1] / np.max(dataset[1], axis=1).reshape(-1,1)
   #scores_feed = (scores_feed -scores_feed.mean(axis=0))/  scores_feed.std(0)
+  #scores_feed = dataset[1] 
   targets_feed = dataset[1]
   feed_dict = {
       features_pl: features_feed,
@@ -93,6 +97,13 @@ def fill_feed_dict(dataset, features_pl, scores_pl, targets_pl):
       targets_pl: targets_feed,
   }
   return feed_dict
+
+def round_dict(dic,digs=4):
+    for k in dic.keys():
+        pass
+        #dic[k] = round(dic[k],digs)
+    #pdb.set_trace()
+    return dic
 
 def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
   """Train nn for a number of steps."""
@@ -111,7 +122,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
   with tf.Graph().as_default():
     # Generate placeholders for the images and labels.
     features_placeholder, scores_placeholder, targets_placeholder = \
-            placeholder_inputs(SIZE_BATCH)
+            placeholder_inputs()
 
     # Build a Graph that computes predictions from the inference model.
     preds, preds_agg = nn.inference(features_placeholder, scores_placeholder,
@@ -121,7 +132,8 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     loss = nn.loss(preds, preds_agg, targets_placeholder)
 
     # Add to the Graph the Ops that calculate and apply gradients.
-    train_op = nn.training(loss, RATE_LEARNING, RATE_LEARNING_AGG)
+    train_op_1 = nn.training(loss, RATE_LEARNING_1, RATE_LEARNING_AGG_1)
+    train_op_2 = nn.training(loss, RATE_LEARNING_2, RATE_LEARNING_AGG_2)
 
     # Add the Op to compare the logits to the labels during evaluation.
     eval_model = nn.evaluation(preds, preds_agg, targets_placeholder)
@@ -150,71 +162,77 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     max_early_stop = MAX_EARLYSTOP
     cnt_early_stop = 0
     previous_loss = 0.0
-    for step in xrange(MAX_STEPS):
-      start_time = time.time()
+    
+    for train_op in [train_op_1,train_op_2]:
+        #pdb.set_trace()
+        for step in xrange(MAX_STEPS):
+          start_time = time.time()
 
-      # Fill a feed dictionary with the actual set of images and labels
-      # for this particular training step.
-      feed_dict = fill_feed_dict(dataset_trn,
-                                 features_placeholder,
-                                 scores_placeholder,
-                                 targets_placeholder)
-      # Run one step of the model.  The return values are the activations
-      # from the `train_op` (which is discarded) and the `loss` Op.  To
-      # inspect the values of your Ops or variables, you may include them
-      # in the list passed to sess.run() and the value tensors will be
-      # returned in the tuple from the call.
-      _, loss_value = sess.run([train_op, loss],
-                               feed_dict=feed_dict)
-      duration = time.time() - start_time
-      
-      # Write the summaries and print an overview fairly often.
-      if step % 100 == 0:
-        # Print status to stdout.
-        print('-'*40)
-        print('Step %d: loss = %.4f (%.3f sec)' % (step, loss_value, duration))
-        if step % 5000:
-            # Update the events file.
-            summary_str = sess.run(summary, feed_dict=feed_dict)
-            summary_writer.add_summary(summary_str, step)
-            #summary_writer.flush()
+          # Fill a feed dictionary with the actual set of images and labels
+          # for this particular training step.
+          feed_dict = fill_feed_dict(dataset_trn,
+                                     features_placeholder,
+                                     scores_placeholder,
+                                     targets_placeholder, SIZE_BATCH)
+          # Run one step of the model.  The return values are the activations
+          # from the `train_op` (which is discarded) and the `loss` Op.  To
+          # inspect the values of your Ops or variables, you may include them
+          # in the list passed to sess.run() and the value tensors will be
+          # returned in the tuple from the call.
+          _, loss_value = sess.run([train_op, loss],
+                                   feed_dict=feed_dict)
+          duration = time.time() - start_time
+          
+          # Write the summaries and print an overview fairly often.
+          if step % 100 == 0:
+            # Print status to stdout.
+            print('-'*40)
+            print('Step %d: loss = %.4f (%.3f sec)' % (step, loss_value, duration))
+            if step % 1000 ==0:
+                # Update the events file.
+                summary_str = sess.run(summary, feed_dict=feed_dict)
+                summary_writer.add_summary(summary_str, step)
+                #summary_writer.flush()
 
-      # Save a checkpoint and evaluate the model periodically.
-      if (step + 1) % 100 == 0 or (step + 1) == MAX_STEPS:
-        
-        #checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
-        #saver.save(sess, checkpoint_file, global_step=step)
-        # Evaluate against the training set.
-        print('Training Data Eval:')
-        feed_dict = fill_feed_dict(dataset_trn, 
-                features_placeholder, scores_placeholder, targets_placeholder)
-        accu = sess.run(eval_model, feed_dict=feed_dict)
-        print(accu)
-        # Evaluate against the validation set.
-        if dataset_val:
-            print('Validation Data Eval:')
-            feed_dict = fill_feed_dict(dataset_val, 
-                    features_placeholder, scores_placeholder,
-                    targets_placeholder)
+          # Save a checkpoint and evaluate the model periodically.
+          if (step + 1) % 100 == 0 or (step + 1) == MAX_STEPS:
+            
+            #checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
+            #saver.save(sess, checkpoint_file, global_step=step)
+            # Evaluate against the training set.
+            print('Training Data Eval:')
+            feed_dict = fill_feed_dict(dataset_trn, 
+                    features_placeholder, scores_placeholder, targets_placeholder)
             accu = sess.run(eval_model, feed_dict=feed_dict)
-            print(accu)
-            # update early stop and terminate, if necessary
-            if accu['MAE'] > previous_loss:
-                cnt_early_stop += 1
-            else:
-                cnt_early_stop = 0
-            if cnt_early_stop > max_early_stop:
-                break
-            previous_loss = accu['MAE']
-            print('Eearly Stop counter: '+\
-                    str(cnt_early_stop)+'/'+str(max_early_stop))
-        if dataset_tst:
-            print('Test Data Eval:')
-            feed_dict = fill_feed_dict(dataset_tst, 
-                    features_placeholder, scores_placeholder,
-                    targets_placeholder)
-            accu = sess.run(eval_model, feed_dict=feed_dict)
-            print(accu)
+            print(round_dict(accu))
+            # Evaluate against the validation set.
+            if dataset_val:
+                print('Validation Data Eval:')
+                feed_dict = fill_feed_dict(dataset_val, 
+                        features_placeholder, scores_placeholder,
+                        targets_placeholder)
+                accu = sess.run(eval_model, feed_dict=feed_dict)
+                print(round_dict(accu))
+                # update early stop and terminate, if necessary
+                if accu['MAE'] > previous_loss:
+                    cnt_early_stop += 1
+                else:
+                    cnt_early_stop = 0
+                if cnt_early_stop > max_early_stop:
+                    break
+                previous_loss = accu['MAE']
+                print('Eearly Stop counter: '+\
+                        str(cnt_early_stop)+'/'+str(max_early_stop))
+            if dataset_tst:
+                print('Test Data Eval:')
+                feed_dict = fill_feed_dict(dataset_tst, 
+                        features_placeholder, scores_placeholder,
+                        targets_placeholder)
+                accu = sess.run(eval_model, feed_dict=feed_dict)
+                print(round_dict(accu))
+    
+    checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
+    saver.save(sess, checkpoint_file, global_step=step)
     # Evaluate against the test set.
     if dataset_tst:
         print('Test Data Eval:')
@@ -226,7 +244,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
         agg_preds = sess.run(preds_agg, feed_dict=feed_dict)
         
         targets_tst = np.sum(dataset_tst[1] * agg_preds, axis=1).reshape(-1,1)
-        print(accu)
+        print(round_dict(accu))
         #pdb.set_trace()
         if DEBUG:
             print(agg_preds)

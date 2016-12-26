@@ -24,7 +24,7 @@ DATASET_NAME = sys.argv[1]#'dataset_718885'
 ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
-COMBINE_EXPS = False
+COMBINE_EXPS = True
 TARGET = 'force' 
 DIFFERENCE_MAX = 1.5#2.00
 DIFFERENCE_MIN = -0.50
@@ -207,7 +207,7 @@ if ANALYSIS_CLASSIFICATION:
                 features=exp_features, 
                 targets=exp_targets, ids=exp_ids, 
                 params=None, 
-                n_folds=10,
+                n_folds=5,
                 debug=True, seed=-1)
     else:
         raise ValueError('Invalid LEARNER')

@@ -48,7 +48,7 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
     with tf.name_scope('hidden'+str(cnt_hid)):
         weights = tf.Variable(
                 tf.truncated_normal([int(hidden.get_shape()[1]), unit_hid],
-                            stddev=1.0 / math.sqrt(float(N_FE))),
+                            stddev=1.0 / math.sqrt(float(int(hidden.get_shape()[1])))),
                 name='weights')
         biases = tf.Variable(tf.zeros([unit_hid]),
                          name='biases')
@@ -59,7 +59,7 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
   with tf.name_scope('output'):
     weights = tf.Variable(
         tf.truncated_normal([hidden_units[-1], 1],
-                            stddev=1.0 / math.sqrt(float(hidden_units[-1]))),
+                            stddev=1.0 / math.sqrt(float(int(hidden_units[-1])))),
         name='weights')
     biases = tf.Variable(tf.zeros([1]),
                          name='biases')
@@ -81,7 +81,7 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
     with tf.name_scope('agg_hidden'+str(cnt_hid)):
         weights = tf.Variable(
                 tf.truncated_normal([int(hidden.get_shape()[1]), unit_hid],
-                            stddev=1.0 / math.sqrt(float(N_SN))),
+                            stddev=1.0 / math.sqrt(float(int(hidden.get_shape()[1])))),
                 name='weights')
         biases = tf.Variable(tf.zeros([unit_hid]),
                          name='biases')
@@ -104,9 +104,9 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
     #    tf.reduce_sum(agg_preds_n, axis=1), (-1,1)))
   
   #agg_preds_mean = tf.ones([tf.shape(preds)[0], 3], dtype=tf.float32) / 3.0
-  t_tmp = tf.ones([tf.shape(preds)[0], 1], dtype=tf.float32)
-  agg_preds_0 = tf.reshape(tf.stack([t_tmp*0.7,t_tmp*0.2,t_tmp*0.1], axis=1),
-          (-1,3))
+  #t_tmp = tf.ones([tf.shape(preds)[0], 1], dtype=tf.float32)
+  #agg_preds_0 = tf.reshape(tf.stack([t_tmp*0.7,t_tmp*0.2,t_tmp*0.1], axis=1),
+  #        (-1,3))
 
   return preds, agg_preds
 
