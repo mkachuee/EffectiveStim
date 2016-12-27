@@ -90,9 +90,9 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
   
   # agg output
   with tf.name_scope('agg_output'):
-    weights = tf.Variable(
+    weights = tf.Variable(# FIXME
         tf.truncated_normal([hidden_units_agg[-1], 3],
-                            stddev=1.0 / math.sqrt(float(hidden_units_agg[-1]))),
+                            stddev=1.0e-2 / math.sqrt(float(hidden_units_agg[-1]))),
         name='weights')
 
 

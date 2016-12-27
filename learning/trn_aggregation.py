@@ -23,18 +23,18 @@ import learning.nn_aggregation as nn
 
 
 # parameters
-DEBUG = 1
+DEBUG = 0
 
 N_FE = 3
 SIZE_BATCH = None
-SIZE_HIDDENS = [128,128]#[128,128]
-SIZE_HIDDENS_AGG = [128,128]#[128,128]
-RATE_LEARNING_1 = 1.0e-3
-RATE_LEARNING_AGG_1 = 1.0e-3
-RATE_LEARNING_2 = 1.0e-4
-RATE_LEARNING_AGG_2 = 1.0e-4
+SIZE_HIDDENS = [32,32]#[128,128]
+SIZE_HIDDENS_AGG = [16,16]#[128,128]
+RATE_LEARNING_1 = 1.0e-2
+RATE_LEARNING_AGG_1 = 1.0e-2
+RATE_LEARNING_2 = 1.0e-3
+RATE_LEARNING_AGG_2 = 1.0e-3
 MAX_STEPS = 100000
-MAX_EARLYSTOP = 100 #MAX_STEPS# FIXME
+MAX_EARLYSTOP = 10 #MAX_STEPS
 DIR_LOG = './logs'
 
 os.system('rm -r '+DIR_LOG)
@@ -105,7 +105,8 @@ def round_dict(dic,digs=4):
     #pdb.set_trace()
     return dic
 
-def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
+def run_training(dataset_trn,dataset_val=None,dataset_tst=None, 
+        dataset_pred=None):
   """Train nn for a number of steps."""
   # if we don't have any val data, select it from trn
   if not dataset_val:
@@ -234,6 +235,9 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
     checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
     saver.save(sess, checkpoint_file, global_step=step)
     # Evaluate against the test set.
+    preds_tst = None
+    targets_tst = None
+    aggregate_preds = None
     if dataset_tst:
         print('Test Data Eval:')
         feed_dict = fill_feed_dict(dataset_tst, 
@@ -249,7 +253,16 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None):
         if DEBUG:
             print(agg_preds)
             pdb.set_trace()
-        return preds_tst, targets_tst
+    if dataset_pred:
+        feed_dict = fill_feed_dict(dataset_pred, 
+                features_placeholder, scores_placeholder,
+                targets_placeholder)
+        aggregate_preds = sess.run(preds_agg, feed_dict=feed_dict)
+    
+    return preds_tst, targets_tst, aggregate_preds
+
+    #, model{'session':sess, 'feed'
+    #            'predictor_agg':preds_agg, 'predictor':preds}
 
 def regress_nn(features, targets, ids, params=None, 
         debug=False, n_folds=10, seed=None):
@@ -267,18 +280,22 @@ def regress_nn(features, targets, ids, params=None,
     scaler = sklearn.preprocessing.StandardScaler()
     features = scaler.fit_transform(features)
     
-    # to k fold test and traini
+    # do k fold test and train
     test_ids = []
     test_targets = []
     test_predictions = []
+    agg_predictions = []
     kf = sklearn.model_selection.KFold(n_splits=n_folds)
     for ind_train, ind_test in kf.split(targets):
         # create a cross validated model for each fold
         dataset_trn = (features[ind_train],targets[ind_train])
         dataset_tst = (features[ind_test],targets[ind_test])
-        preds_test, targets_test = run_training(dataset_trn=dataset_trn, 
-                dataset_tst=dataset_tst)
-        
+        dataset_pred = (features,targets)
+        preds_test, targets_test, agg_preds = run_training(
+                dataset_trn=dataset_trn, dataset_tst=dataset_tst, 
+                dataset_pred=dataset_pred)
+        # append results
+        agg_predictions.append(agg_preds)
         test_predictions.append(preds_test)
         test_targets.append(targets_test)
         test_ids.append(ids[ind_test])
@@ -286,6 +303,7 @@ def regress_nn(features, targets, ids, params=None,
     test_targets = np.vstack(test_targets)
     test_predictions = np.vstack(test_predictions)
     test_ids = np.vstack(test_ids)
+    agg_predictions = np.array(agg_predictions).mean(axis=0)
     mae = np.around((np.abs(test_targets-test_predictions)).mean(), 
             decimals=4)
     std = np.around(np.std(test_targets-test_predictions), 
@@ -316,4 +334,5 @@ def regress_nn(features, targets, ids, params=None,
         plt.axis('equal')
         embed()
     
-    return {'r_value':r_value, 'MAE':mae, 'STD':std}
+    return {'r_value':r_value, 'MAE':mae, 'STD':std, 
+            'aggregate_preds':agg_predictions}

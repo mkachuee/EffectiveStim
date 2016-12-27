@@ -19,23 +19,26 @@ import learning.trn_aggregation
 
 plt.ion()
 
+
+LOAD_TEST_DATA = False
 DATASET_NAME = sys.argv[1]#'dataset_718885'
 
 ANALYSIS_VISUALIZATION = False
 
 ANALYSIS_CLASSIFICATION = True
-COMBINE_EXPS = True
+COMBINE_EXPS = False
 TARGET = 'force' 
 DIFFERENCE_MAX = 1.5#2.00
 DIFFERENCE_MIN = -0.50
 VARIATION_MAX = 9991.10
 ANOMALITY_MAX = 9991.0
-LOAD_TEST_DATA = False
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
+LEARNER = 'nn_agg'
+#LEARNER = 'svr_comp'#'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
 
+BLACKLIST = ['HG17']
 
 # load dataset file
 dataset = scipy.io.loadmat('./run_data/' + DATASET_NAME + '.mat')
@@ -158,8 +161,37 @@ exp_features = exp_features[inds]
 
 
 if LOAD_TEST_DATA:
-    exp_features, exp_targets = sklearn.datasets.load_diabetes(True)
-        
+    N_FE = 3
+    N_SA = 1024
+    N_TR = 3
+    NORMAL_NOISE_STD = 0.45
+    EXTRA_PERCENTAGE = 0.25
+    EXTRA_NOISE_STD = 1.0
+    np.random.seed(0)
+    exp_ids = np.arange(0,N_SA).reshape(-1,1)
+    exp_features = np.random.rand(N_SA,N_FE)
+    exp_targets = exp_features[:,0] + 3**exp_features[:,1] + \
+            exp_features[:,2]**7
+    exp_targets = np.hstack([exp_targets.reshape(-1,1)]*N_TR)
+    exp_targets = (exp_targets-exp_targets.mean(axis=0)) / \
+            exp_targets.std(axis=0)
+    # add some gaussian noise
+    exp_targets += np.random.normal(loc=0.0, 
+            scale=NORMAL_NOISE_STD, size=exp_targets.shape)
+    # add extra noise to some trials
+    for ind_fe in range(N_FE):
+        extra_inds = np.random.choice(N_SA, int(EXTRA_PERCENTAGE*N_SA), 
+                replace=False)
+        exp_targets[extra_inds,ind_fe] *= np.random.normal(loc=0.0, 
+                scale=EXTRA_NOISE_STD, size=(len(extra_inds),))
+    #pdb.set_trace()
+
+for k in BLACKLIST:
+    inds_ok = (np.core.defchararray.find(exp_ids,k) < 0).ravel()
+    exp_ids = exp_ids[inds_ok]
+    exp_targets = exp_targets[inds_ok]
+    exp_features = exp_features[inds_ok]
+
 
 if ANALYSIS_CLASSIFICATION:
     
@@ -198,17 +230,36 @@ if ANALYSIS_CLASSIFICATION:
                 params=None, 
                 n_folds=10,
                 debug=True, seed=0)
+    elif LEARNER == 'svr_comp':
+        agg_targets = np.mean(exp_targets, axis=1)
+        accu = supervised_learning.regress_svr(features=exp_features, 
+                targets=agg_targets, ids=exp_ids, 
+                params=[{ 'kernel': ['rbf'],
+                    'C': 10.0**np.linspace(0,2,10),
+                    'gamma': 10.0**np.linspace(-3,-1,10),
+                    'epsilon': 10.0**np.linspace(-3,-1,10),}],
+                n_folds=10, debug=True)
+
+        #embed()
     elif LEARNER == 'nn_agg':
-        # FIXME
-        #theta = [0.6567, 0.2227, 0.1205]
-        #exp_targets = exp_targets.dot(np.vstack(theta))
-        #exp_targets = np.matlib.repmat(exp_targets, 1,3)
-        accu = learning.trn_aggregation.regress_nn(
+        res = learning.trn_aggregation.regress_nn(
                 features=exp_features, 
                 targets=exp_targets, ids=exp_ids, 
                 params=None, 
                 n_folds=5,
-                debug=True, seed=-1)
+                debug=False, seed=-1)
+        
+        agg_preds = res['aggregate_preds']
+        agg_targets = np.sum(agg_preds*exp_targets, axis=1)
+        accu = supervised_learning.regress_svr(features=exp_features, 
+                targets=agg_targets, ids=exp_ids, 
+                params=[{ 'kernel': ['rbf'],
+                    'C': 10.0**np.linspace(0,2,10),
+                    'gamma': 10.0**np.linspace(-3,-1,10),
+                    'epsilon': 10.0**np.linspace(-3,-1,10),}],
+                n_folds=10, debug=True)
+
+        #embed()
     else:
         raise ValueError('Invalid LEARNER')
 
