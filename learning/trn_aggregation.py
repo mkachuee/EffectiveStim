@@ -26,14 +26,14 @@ import learning.nn_aggregation as nn
 DEBUG = 0
 
 N_FE = 3
-SIZE_BATCH = None
-SIZE_HIDDENS = [32,32]#[128,128]
-SIZE_HIDDENS_AGG = [16,16]#[128,128]
+SIZE_BATCH = 0.9#None
+SIZE_HIDDENS = [32]#[32,32]#[128,128]
+SIZE_HIDDENS_AGG = [32]#[32,32]#[128,128]
 RATE_LEARNING_1 = 1.0e-2
 RATE_LEARNING_AGG_1 = 1.0e-2
 RATE_LEARNING_2 = 1.0e-3
 RATE_LEARNING_AGG_2 = 1.0e-3
-MAX_STEPS = 100000
+MAX_STEPS = 1000000
 MAX_EARLYSTOP = 10 #MAX_STEPS
 DIR_LOG = './logs'
 
@@ -192,7 +192,7 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None,
             if step % 1000 ==0:
                 # Update the events file.
                 summary_str = sess.run(summary, feed_dict=feed_dict)
-                summary_writer.add_summary(summary_str, step)
+                #summary_writer.add_summary(summary_str, step)
                 #summary_writer.flush()
 
           # Save a checkpoint and evaluate the model periodically.
@@ -232,8 +232,8 @@ def run_training(dataset_trn,dataset_val=None,dataset_tst=None,
                 accu = sess.run(eval_model, feed_dict=feed_dict)
                 print(round_dict(accu))
     
-    checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
-    saver.save(sess, checkpoint_file, global_step=step)
+    #checkpoint_file = os.path.join(DIR_LOG, 'model.ckpt')
+    #saver.save(sess, checkpoint_file, global_step=step)
     # Evaluate against the test set.
     preds_tst = None
     targets_tst = None

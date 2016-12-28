@@ -36,9 +36,13 @@ ANOMALITY_MAX = 9991.0
 SCORE_THRESHOLD = 0.40
 
 LEARNER = 'nn_agg'
-#LEARNER = 'svr_comp'#'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
+#LEARNER = 'svr_comp'
+#'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
 
-BLACKLIST = ['HG17']
+BLACKLIST = ['HG17','HG25']
+
+# define a base random seed
+#np.random.seed(111)
 
 # load dataset file
 dataset = scipy.io.loadmat('./run_data/' + DATASET_NAME + '.mat')
@@ -248,7 +252,7 @@ if ANALYSIS_CLASSIFICATION:
                 params=None, 
                 n_folds=5,
                 debug=False, seed=-1)
-        
+        print(res) 
         agg_preds = res['aggregate_preds']
         agg_targets = np.sum(agg_preds*exp_targets, axis=1)
         accu = supervised_learning.regress_svr(features=exp_features, 
