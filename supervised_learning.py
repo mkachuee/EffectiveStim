@@ -246,16 +246,24 @@ def regress_active_svr(features, targets, ids,
                 preds_commitee_std = np.vstack(preds_commitee_norm).std(axis=0)
                 inds_request_order = [inds_unknown[r] for r in \
                         np.argsort(preds_commitee_std)[::-1]]
-                
+                xx = np.arange(0,len(inds_request_order)) + 1.0
+                weights_prob = np.exp((-16.0*xx)/len(xx))
+                weights_prob /= np.sum(weights_prob)
                 # find best request while preserving random state
                 inds_request_rand = np.random.choice(inds_unknown, 
                         size=min(len(inds_unknown),step_size),
                         replace=False).tolist()
                 inds_request_comm = inds_request_order[:step_size]
+                inds_request_weighted = np.random.choice(inds_request_order, 
+                        size=min(len(inds_request_order),step_size),
+                        replace=False, p=weights_prob).tolist()
+                
                 if criteria == 'committee':
                     inds_request = inds_request_comm
                 elif criteria == 'rand':
                     inds_request = inds_request_rand
+                elif criteria == 'prob':
+                    inds_request = inds_request_weighted
                 else:
                     raise NameError('Unknown AL criteria')
                 inds_known += inds_request

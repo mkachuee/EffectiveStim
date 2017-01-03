@@ -37,6 +37,7 @@ MAX_STEPS = 1000000
 MAX_EARLYSTOP = 10 #MAX_STEPS
 DIR_LOG = './logs'
 
+np.random.seed(112)
 os.system('rm -r '+DIR_LOG)
 
 def placeholder_inputs():
@@ -276,6 +277,7 @@ def regress_nn(features, targets, ids, params=None,
         features = features[ind_perms]
         targets = targets[ind_perms]
         ids = ids[ind_perms]
+
     # normalize features
     scaler = sklearn.preprocessing.StandardScaler()
     features = scaler.fit_transform(features)

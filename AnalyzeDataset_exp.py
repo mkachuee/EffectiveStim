@@ -3,6 +3,7 @@ import time
 import pdb
 import getpass
 import glob
+import multiprocessing
 
 from IPython import embed
 import numpy as np
@@ -35,14 +36,14 @@ ANOMALITY_MAX = 9991.0
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'nn_agg'
+LEARNER = 'nn_agg_active'
 #LEARNER = 'svr_comp'
 #'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
-
+USE_CACHE = True
 BLACKLIST = ['HG17','HG25']
 
 # define a base random seed
-#np.random.seed(111)
+np.random.seed(111)
 
 # load dataset file
 dataset = scipy.io.loadmat('./run_data/' + DATASET_NAME + '.mat')
@@ -264,6 +265,92 @@ if ANALYSIS_CLASSIFICATION:
                 n_folds=10, debug=True)
 
         #embed()
+    elif LEARNER == 'nn_agg_active':
+        try:
+            agg_dataset = scipy.io.loadmat(
+                    './run_data/agg_dataset.mat')
+        except:
+            agg_dataset = None
+        if (not USE_CACHE) or (type(agg_dataset)==type(None)):
+            res = learning.trn_aggregation.regress_nn(
+                    features=exp_features, 
+                    targets=exp_targets, ids=exp_ids, 
+                    params=None, 
+                    n_folds=5,
+                    debug=False, seed=-1)
+            print(res) 
+            agg_preds = res['aggregate_preds']
+            scipy.io.savemat('./run_data/agg_dataset.mat', 
+                    {'agg_preds':agg_preds, 
+                    'exp_ids':exp_ids,
+                    'exp_features':exp_features,
+                    'exp_targets':exp_targets})
+        else:
+            print('Using cached agg_preds.')
+        agg_dataset = scipy.io.loadmat(
+                './run_data/agg_dataset.mat')
+        exp_ids = agg_dataset['exp_ids']
+        exp_targets = agg_dataset['exp_targets']
+        exp_features = agg_dataset['exp_features']
+        agg_preds = agg_dataset['agg_preds']
+        agg_targets = np.sum(agg_preds*exp_targets, axis=1)
+        
+        accuracies = []
+        #for _ in range(10):
+        def trn_eval(criteria, seed):
+            accu = supervised_learning.regress_active_svr(
+                    features=exp_features, 
+                    targets=agg_targets.ravel(), ids=exp_ids, 
+                    initial_portion=0.20, final_portion=1.00, 
+                    criteria = criteria, seed=seed, step_size=2,
+                    debug=False)
+            #accuracies.append(accu)
+            return accu
+        pool = multiprocessing.Pool(8)
+        runs = 32 
+        accuracies = [pool.apply_async(trn_eval, ('committee',seed))\
+                for seed in range(runs)]
+
+        accuracies = [a.get() for a in accuracies]
+        accu_mean = {}
+        for k in accuracies[0].keys():
+            accu_k = [a[k] for a in accuracies]
+            accu_mean[k] = np.vstack(accu_k).mean(axis=0)
+        
+        accuracies = [pool.apply_async(trn_eval, ('rand',seed))\
+                for seed in range(runs)]
+        accuracies = [a.get() for a in accuracies]
+        accu_mean_rand = {}
+        for k in accuracies[0].keys():
+            accu_k = [a[k] for a in accuracies]
+            accu_mean_rand[k] = np.vstack(accu_k).mean(axis=0)
+        
+        plt.ion()
+        plt.figure()
+        plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'k')
+        plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'ok')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'k--')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'^k')
+        plt.xlabel('portions')
+        plt.ylabel('r_value')
+        plt.figure()
+        plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'k')
+        plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'ok')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'k--')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'^k')
+        plt.xlabel('portions')
+        plt.ylabel('MAE')
+        plt.figure()
+        plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'k')
+        plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'ok')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'k--')
+        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'^k')
+        plt.xlabel('portions')
+        plt.ylabel('STD')
+        plt.ion()
+        plt.draw()
+        embed()
+        
     else:
         raise ValueError('Invalid LEARNER')
 
