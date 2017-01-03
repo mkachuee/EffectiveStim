@@ -117,12 +117,16 @@ def regress_svr(features, targets, ids,
             #}
             ], 
         n_folds=10, 
-        debug=False):
+        debug=False, 
+        seed=None):
     # random permutation
-    ind_perms = np.random.permutation(features.shape[0])
-    features = features[ind_perms]
-    targets = targets[ind_perms]
-    ids = ids[ind_perms]
+    if seed != -1:
+        np.random.seed(seed)
+        ind_perms = np.random.permutation(features.shape[0])
+        features = features[ind_perms]
+        targets = targets[ind_perms]
+        ids = ids[ind_perms]
+    
     # normalize features
     scaler = sklearn.preprocessing.StandardScaler()
     features = scaler.fit_transform(features)
