@@ -302,12 +302,12 @@ if ANALYSIS_CLASSIFICATION:
                     features=exp_features, 
                     targets=agg_targets.ravel(), ids=exp_ids, 
                     initial_portion=0.20, final_portion=1.00, 
-                    criteria = criteria, seed=seed, step_size=2,
+                    criteria = criteria, seed=seed, step_size=1,
                     debug=False)
             #accuracies.append(accu)
             return accu
         pool = multiprocessing.Pool(8)
-        runs = 32 
+        runs = 16 
         accuracies = [pool.apply_async(trn_eval, ('committee',seed))\
                 for seed in range(runs)]
 
@@ -328,25 +328,28 @@ if ANALYSIS_CLASSIFICATION:
         plt.ion()
         plt.figure()
         plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'k')
-        plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'ok')
+        #plt.plot(accu_mean['portions'],accu_mean['portions_r_value'], 'ok')
         plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'k--')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'^k')
-        plt.xlabel('portions')
+        #plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_r_value'],'^k')
+        plt.xlabel('Fraction of training data')
         plt.ylabel('r_value')
+        plt.legend(['Active Learning', 'Random Sampling'], loc='lower right')
         plt.figure()
         plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'k')
-        plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'ok')
+        #plt.plot(accu_mean['portions'],accu_mean['portions_mae'], 'ok')
         plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'k--')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'^k')
-        plt.xlabel('portions')
+        #plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_mae'],'^k')
+        plt.xlabel('Fraction of training data')
         plt.ylabel('MAE')
+        plt.legend(['Active Learning', 'Random Sampling'], loc='upper right')
         plt.figure()
         plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'k')
-        plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'ok')
+        #plt.plot(accu_mean['portions'],accu_mean['portions_std'], 'ok')
         plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'k--')
-        plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'^k')
-        plt.xlabel('portions')
+        #plt.plot(accu_mean_rand['portions'],accu_mean_rand['portions_std'],'^k')
+        plt.xlabel('Fraction of training data')
         plt.ylabel('STD')
+        plt.legend(['Active Learning', 'Random Sampling'], loc='upper right')
         plt.ion()
         plt.draw()
         embed()

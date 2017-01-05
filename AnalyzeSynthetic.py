@@ -22,13 +22,14 @@ plt.ion()
 
 
 LOAD_TEST_DATA = True
-CFG = 3
+CFG = 6
 ANALYSIS_VISUALIZATION = False
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'nn_agg'
-#LEARNER = 'svr_mean'
+LEARNER = 'svr_mean'
+#LEARNER = 'svr_median'
+#LEARNER = 'nn_agg'
 USE_CACHE = True
 
 # define a base random seed
@@ -57,6 +58,28 @@ if LOAD_TEST_DATA:
         NORMAL_NOISE_STD = 0.45
         EXTRA_PERCENTAGE = 0.50
         EXTRA_NOISE_STD = 1.0
+    elif CFG == 4:
+        N_FE = 3
+        N_SA = 1024
+        N_TR = 3
+        NORMAL_NOISE_STD = 0.15
+        EXTRA_PERCENTAGE = 0.50
+        EXTRA_NOISE_STD = 1.0
+    elif CFG == 5:
+        N_FE = 3
+        N_SA = 1024
+        N_TR = 3
+        NORMAL_NOISE_STD = 0.05
+        EXTRA_PERCENTAGE = 0.20
+        EXTRA_NOISE_STD = 1.0
+    elif CFG == 6:
+        N_FE = 3
+        N_SA = 8*1024
+        N_TR = 3
+        NORMAL_NOISE_STD = 0.45
+        EXTRA_PERCENTAGE = 0.50
+        EXTRA_NOISE_STD = 1.0
+   
     
     np.random.seed(0)
     exp_ids = np.arange(0,N_SA).reshape(-1,1)
@@ -126,6 +149,17 @@ elif LEARNER == 'svr_mean':
             n_folds=5, seed=-1, debug=True)
 
     #embed()
+elif LEARNER == 'svr_median':
+    agg_targets = np.median(exp_targets, axis=1)
+    accu = supervised_learning.regress_svr(features=exp_features, 
+            targets=agg_targets, ids=exp_ids, 
+            params=[{ 'kernel': ['rbf'],
+                'C': 10.0**np.linspace(0,2,5),
+                'gamma': 10.0**np.linspace(-3,-1,5),
+                'epsilon': 10.0**np.linspace(-3,-1,5),}],
+            n_folds=5, seed=-1, debug=True)
+
+    #embed()
 elif LEARNER == 'nn_agg':
     res = learning.trn_aggregation.regress_nn(
             features=exp_features, 
@@ -144,7 +178,7 @@ elif LEARNER == 'nn_agg':
                 'epsilon': 10.0**np.linspace(-3,-1,5),}],
             n_folds=5, seed=-1,debug=True)
 
-    #embed()
+    embed()
 elif LEARNER == 'nn_agg_active':
     try:
         agg_dataset = scipy.io.loadmat(
