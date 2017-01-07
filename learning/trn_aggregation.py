@@ -41,6 +41,7 @@ DIR_LOG = './logs'
 np.random.seed(112)
 os.system('rm -r '+DIR_LOG)
 
+
 def placeholder_inputs():
   """Generate placeholder variables to represent the input tensors.
 

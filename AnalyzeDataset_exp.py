@@ -17,6 +17,7 @@ import supervised_learning
 import parameter_search
 import learning.trn_simple_regression 
 import learning.trn_aggregation
+import learning.nn_trainer
 
 plt.ion()
 
@@ -36,11 +37,27 @@ ANOMALITY_MAX = 9991.0
 
 SCORE_THRESHOLD = 0.40
 
-LEARNER = 'nn_agg_active'
+LEARNER = 'nn_agg'
+#LEARNER = 'nn_agg_active'
 #LEARNER = 'svr_comp'
 #'nn_agg'#'nn_expsel'#'lsearch_expsel' #'gsearch_expsel'
 USE_CACHE = True
 BLACKLIST = ['HG17','HG25']
+
+
+params_nn = {
+        'N_FE':3,
+        'N_SN':3,
+        'SIZE_BATCH':0.9,
+        'SIZE_HIDDENS':[32],
+        'SIZE_HIDDENS_AGG':[32],
+        'RATE_LEARNING_1':1.0e-2,
+        'RATE_LEARNING_AGG_1':1.0e-2,
+        'RATE_LEARNING_2':1.0e-3,
+        'RATE_LEARNING_AGG_2':1.0e-3,
+        'MAX_STEPS':1000000,
+        'MAX_EARLYSTOP':10,
+        'DIR_LOG':'./logs'}
 
 # define a base random seed
 np.random.seed(111)
@@ -247,7 +264,8 @@ if ANALYSIS_CLASSIFICATION:
 
         #embed()
     elif LEARNER == 'nn_agg':
-        res = learning.trn_aggregation.regress_nn(
+        nn_agg_trainer = learning.nn_trainer.NNTrainer(params_nn)
+        res = nn_agg_trainer.regress_nn(
                 features=exp_features, 
                 targets=exp_targets, ids=exp_ids, 
                 params=None, 
@@ -264,15 +282,16 @@ if ANALYSIS_CLASSIFICATION:
                     'epsilon': 10.0**np.linspace(-3,-1,10),}],
                 n_folds=10, debug=True)
 
-        #embed()
+        embed()
     elif LEARNER == 'nn_agg_active':
         try:
             agg_dataset = scipy.io.loadmat(
-                    './run_data/agg_dataset.mat')
+                    './run_data/agg_dataset_TMP.mat')
         except:
             agg_dataset = None
         if (not USE_CACHE) or (type(agg_dataset)==type(None)):
-            res = learning.trn_aggregation.regress_nn(
+            nn_agg_trainer = learning.nn_trainer.NNTrainer(params_nn)
+            res = nn_agg_trainer.regress_nn(
                     features=exp_features, 
                     targets=exp_targets, ids=exp_ids, 
                     params=None, 
@@ -280,7 +299,7 @@ if ANALYSIS_CLASSIFICATION:
                     debug=False, seed=-1)
             print(res) 
             agg_preds = res['aggregate_preds']
-            scipy.io.savemat('./run_data/agg_dataset.mat', 
+            scipy.io.savemat('./run_data/agg_dataset_TMP.mat', 
                     {'agg_preds':agg_preds, 
                     'exp_ids':exp_ids,
                     'exp_features':exp_features,
@@ -288,7 +307,7 @@ if ANALYSIS_CLASSIFICATION:
         else:
             print('Using cached agg_preds.')
         agg_dataset = scipy.io.loadmat(
-                './run_data/agg_dataset.mat')
+                './run_data/agg_dataset_TMP.mat')
         exp_ids = agg_dataset['exp_ids']
         exp_targets = agg_dataset['exp_targets']
         exp_features = agg_dataset['exp_features']

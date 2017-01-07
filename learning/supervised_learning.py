@@ -117,7 +117,7 @@ def regress_svr(features, targets, ids,
             #}
             ], 
         n_folds=10, 
-        debug=False, 
+        plot=False, debug=False, 
         seed=None):
     # random permutation
     if seed != -1:
@@ -158,13 +158,13 @@ def regress_svr(features, targets, ids,
             decimals=4)
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
             test_targets,test_predictions) 
-    if debug:
-        print('MAE is: ' + str(mae))
-        print('Null MAE is: ' + str(mae_null))
-        print('STD is: ' + str(std))
-        print('Null STD is: ' + str(std_null))
-        print('r is: ' + str(r_value))
-        #print('Null r is: ' + str(r_value_null))
+    print('MAE is: ' + str(mae))
+    print('Null MAE is: ' + str(mae_null))
+    print('STD is: ' + str(std))
+    print('Null STD is: ' + str(std_null))
+    print('r is: ' + str(r_value))
+    #print('Null r is: ' + str(r_value_null))
+    if plot:
         plt.figure()
         plt.plot(test_targets,test_predictions, 'o')
         reg_range = np.linspace(np.min(test_targets), 
@@ -176,6 +176,8 @@ def regress_svr(features, targets, ids,
         plt.title('r = '+str(np.around(r_value, 2)) + \
                 '\n MAE = '+str(100*mae) + ', STD= '+str(100*std))
         plt.axis('equal')
+
+    if debug:
         embed()
     
     return {'r_value':r_value, 'MAE':mae, 'STD':std}

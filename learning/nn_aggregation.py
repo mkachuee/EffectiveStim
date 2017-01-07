@@ -23,6 +23,12 @@ import tensorflow as tf
 N_FE = 3
 N_SN = 3
 
+def set_params(params=None):
+    global N_FE, N_SN
+    if params != None:
+        N_FE = params['N_FE']
+        N_SN = params['N_SN']
+
 def inference(features, scores_normalized, hidden_units, hidden_units_agg):
   """Build the MNIST model up to where it may be used for inference.
 
@@ -91,7 +97,7 @@ def inference(features, scores_normalized, hidden_units, hidden_units_agg):
   # agg output
   with tf.name_scope('agg_output'):
     weights = tf.Variable(
-        tf.truncated_normal([hidden_units_agg[-1], 3],
+        tf.truncated_normal([hidden_units_agg[-1], N_SN],
                             stddev=1.0 / math.sqrt(float(hidden_units_agg[-1]))),
         name='weights')
 
