@@ -19,11 +19,14 @@ import learning.nn_trainer
 plt.ion()
 
 
-TEST_DATASET = 'boston'#'bp'#'diabetes'
-CFG = 1
-ANALYSIS_VISUALIZATION = False
-
-
+TEST_DATASET = 'diabetes'#'bp'#'diabetes'
+STEPS = 8
+STEP_BASE = 1
+#STEP_BASE = 1#0
+STEP_SIZE = 1
+#STEP_SIZE = 1#0.07#1
+#SWEEP_PARAM = 'n_sn'#'prob_extra'#'std_extra'
+SWEEP_PARAM = 'n_sn'
 
 params_nn = {
         'N_FE':3,
@@ -36,7 +39,7 @@ params_nn = {
         'RATE_LEARNING_2':1.0e-2,
         'RATE_LEARNING_AGG_2':1.0e-2,
         'MAX_STEPS':100000,
-        'MAX_EARLYSTOP':10,
+        'MAX_EARLYSTOP':2,
         'DIR_LOG':'./logs'}
 
 # define a base random seed
@@ -56,50 +59,66 @@ def synthesize_noise(targets, params, seed=0):
                 int(params['EXTRA_PERCENTAGE']*exp_targets.shape[0]), 
                 replace=False)
         exp_targets[extra_inds,ind_sn] += np.random.normal(loc=0.0, 
-                scale=params['EXTRA_NOISE_STD'], size=(len(extra_inds),))
+                scale=params['EXTRA_NOISE_STD']+1.0e-12, 
+                size=(len(extra_inds),))
     #pdb.set_trace()
     return exp_targets
 
-# load dataset
-if TEST_DATASET == 'diabetes':
-    exp_dataset = sklearn.datasets.load_diabetes()
-    exp_features = exp_dataset.data
-    exp_targets = exp_dataset.target.reshape(-1,1)
-    exp_ids = np.arange(0,exp_targets.shape[0]).reshape(-1,1)
-elif TEST_DATASET == 'boston':
-    exp_dataset = sklearn.datasets.load_boston()
-    exp_features = exp_dataset.data
-    exp_targets = exp_dataset.target.reshape(-1,1)
-    exp_ids = np.arange(0,exp_targets.shape[0]).reshape(-1,1)
-elif TEST_DATASET == 'bp':
-    exp_dataset = scipy.io.loadmat('./run_data/dataset_BP.mat')
-    exp_features = exp_dataset['dataset'][0]['features'][0]
-    exp_targets = exp_dataset['dataset'][0]['systolic'][0]
-    exp_ids = exp_dataset['dataset'][0]['id'][0].reshape(-1,1)
 
-# simulate using synthesized noise
-syn_targets = synthesize_noise(targets=exp_targets, 
+
+base_config = {
+    'dataset':'boston',
+    'n_sn':3,
+    'std_normal':0.10,
+    'prob_extra':0.50,
+    'std_extra':4.0}
+dataset_configs = []
+sweep_values = []
+for ind_cfg in range(STEPS):
+    dataset = TEST_DATASET
+    param_sweep = SWEEP_PARAM
+    sweep_values.append(STEP_SIZE*ind_cfg+STEP_BASE)
+    base_config[param_sweep] = sweep_values[-1]
+    base_config['dataset'] = dataset
+    dataset_configs.append(base_config.copy())
+
+list_results = []
+for cfg in dataset_configs:
+    # load dataset
+    if cfg['dataset'] == 'diabetes':
+        exp_dataset = sklearn.datasets.load_diabetes()
+        exp_features = exp_dataset.data
+        exp_targets = exp_dataset.target.reshape(-1,1)
+        exp_ids = np.arange(0,exp_targets.shape[0]).reshape(-1,1)
+    elif cfg['dataset'] == 'boston':
+        exp_dataset = sklearn.datasets.load_boston()
+        exp_features = exp_dataset.data
+        exp_targets = exp_dataset.target.reshape(-1,1)
+        exp_ids = np.arange(0,exp_targets.shape[0]).reshape(-1,1)
+    elif cfg['dataset'] == 'bp':
+        exp_dataset = scipy.io.loadmat('./run_data/dataset_BP.mat')
+        exp_features = exp_dataset['dataset'][0]['features'][0]
+        exp_targets = exp_dataset['dataset'][0]['systolic'][0]
+        exp_ids = exp_dataset['dataset'][0]['id'][0].reshape(-1,1)
+    elif cfg['dataset'] == 'rand':
+        exp_features = np.random.rand(224,5)
+        exp_targets = np.random.rand(224,1)
+        exp_ids = np.arange(0,exp_targets.shape[0]).reshape(-1,1)
+
+    # simulate using synthesized noise
+    exp_targets = synthesize_noise(targets=exp_targets, 
         params={
-            'N_SN':3,
-            'NORMAL_NOISE_STD':0.05,
-            'EXTRA_PERCENTAGE':0.50,
-            'EXTRA_NOISE_STD':1.0})
+            'N_SN':cfg['n_sn'],
+            'NORMAL_NOISE_STD':cfg['std_normal'],
+            'EXTRA_PERCENTAGE':cfg['prob_extra'],
+            'EXTRA_NOISE_STD':cfg['std_extra']})
 
-dataset_config = [{'ids':exp_ids, 
-        'features':exp_features, 
-        'targets':syn_targets}]
-
-for cfg in dataset_config:
-    cfg_ids = cfg['ids']
-    cfg_features = cfg['features']
-    cfg_targets = cfg['targets']
-    
     # train and test each method
     # mean
-    agg_targets = np.mean(cfg_targets, axis=1)
+    agg_targets = np.mean(exp_targets, axis=1)
     accu_mean = learning.supervised_learning.regress_svr(
-            features=cfg_features, 
-            targets=agg_targets, ids=cfg_ids, 
+            features=exp_features, 
+            targets=agg_targets, ids=exp_ids, 
             params=[{ 'kernel': ['rbf'],
                 'C': 10.0**np.linspace(0,2,5),
                 'gamma': 10.0**np.linspace(-3,-1,5),
@@ -107,10 +126,10 @@ for cfg in dataset_config:
             n_folds=5, seed=-1, debug=False)
     
     # median
-    agg_targets = np.median(cfg_targets, axis=1)
+    agg_targets = np.median(exp_targets, axis=1)
     accu_median = learning.supervised_learning.regress_svr(
-            features=cfg_features, 
-            targets=agg_targets, ids=cfg_ids, 
+            features=exp_features, 
+            targets=agg_targets, ids=exp_ids, 
             params=[{ 'kernel': ['rbf'],
                 'C': 10.0**np.linspace(0,2,5),
                 'gamma': 10.0**np.linspace(-3,-1,5),
@@ -118,29 +137,71 @@ for cfg in dataset_config:
             n_folds=5, seed=-1, debug=False)
     
     # dynamic weight prediction
-    params_nn['N_FE'] = cfg_features.shape[1]
-    params_nn['N_SN'] = cfg_targets.shape[1]
+    params_nn['N_FE'] = exp_features.shape[1]
+    params_nn['N_SN'] = exp_targets.shape[1]
     trainer = learning.nn_trainer.NNTrainer(params=params_nn)
     res = trainer.regress_nn(
-            features=cfg_features, 
-            targets=cfg_targets, ids=cfg_ids, 
+            features=exp_features, 
+            targets=exp_targets, ids=exp_ids, 
             params=None, 
             n_folds=5,
             debug=False, seed=-1)
     print(res) 
     agg_preds = res['aggregate_preds']
-    agg_targets = np.sum(agg_preds*cfg_targets, axis=1)
+    agg_targets = np.sum(agg_preds*exp_targets, axis=1)
     accu_agg = learning.supervised_learning.regress_svr(
-            features=cfg_features, 
-            targets=agg_targets, ids=cfg_ids, 
+            features=exp_features, 
+            targets=agg_targets, ids=exp_ids, 
             params=[{ 'kernel': ['rbf'],
                 'C': 10.0**np.linspace(0,2,5),
                 'gamma': 10.0**np.linspace(-3,-1,5),
                 'epsilon': 10.0**np.linspace(-3,-1,5),}],
             n_folds=5, seed=-1,debug=False)
 
-    
+    list_results.append({'accu_median':accu_median, 
+        'accu_mean':accu_mean, 'accu_agg':accu_agg})
 
-#plt.tight_layout()
-#plt.draw()
+
+maes_mean = [a['accu_mean']['MAE'] for a in list_results]
+maes_median = [a['accu_median']['MAE'] for a in list_results]
+maes_agg = [a['accu_agg']['MAE'] for a in list_results]
+
+rs_mean = [a['accu_mean']['r_value'] for a in list_results]
+rs_median = [a['accu_median']['r_value'] for a in list_results]
+rs_agg = [a['accu_agg']['r_value'] for a in list_results]
+
+font_params = {'fontsize':16}
+        #{'fontname':'Times New Roman', 'fontsize':16}#, 
+        #'fontweight':'bold'}
+
+plt.figure()
+plt.plot(sweep_values, maes_agg, 'k', linewidth=2.0)
+plt.plot(sweep_values, maes_median, 'k--', linewidth=2.0)
+plt.plot(sweep_values, maes_mean, 'k-.', linewidth=2.0)
+plt.legend(['agg', 'median', 'mean'], loc='lower right')
+if SWEEP_PARAM == 'prob_extra':
+    plt.xlabel('Probability of Contamination', **font_params)
+elif SWEEP_PARAM == 'std_extra':
+    plt.xlabel('STD of Contamination', **font_params)
+elif SWEEP_PARAM == 'n_sn':
+    plt.xlabel('Number of Samples', **font_params)
+plt.ylabel('MAE', **font_params)
+plt.tight_layout()
+
+plt.figure()
+plt.plot(sweep_values, rs_agg, 'k', linewidth=2.0)
+plt.plot(sweep_values, rs_median, 'k--', linewidth=2.0)
+plt.plot(sweep_values, rs_mean, 'k-.', linewidth=2.0)
+plt.legend(['agg', 'median', 'mean'], loc='upper right')
+if SWEEP_PARAM == 'prob_extra':
+    plt.xlabel('Probability of Contamination', **font_params)
+elif SWEEP_PARAM == 'std_extra':
+    plt.xlabel('STD of Contamination', **font_params)
+elif SWEEP_PARAM == 'n_sn':
+    plt.xlabel('Number of Samples', **font_params)
+plt.ylabel('r', **font_params)
+
+
+plt.tight_layout()
+plt.draw()
 embed()
