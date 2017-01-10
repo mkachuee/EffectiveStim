@@ -139,7 +139,7 @@ def extract_targets_mvc(block_data, debug=False):
 
     return extracted_targets
    
-def extract_targets_emg(block_data, debug=False):
+def extract_targets_emg(block_data, plot=False, debug=False):
     """
     one target vector per block
     """
@@ -157,7 +157,7 @@ def extract_targets_emg(block_data, debug=False):
     sig_emg -= sig_emg.mean()
     sig_pulse = np.abs(sig_pulse)
     sig_emg = np.abs(sig_emg)
-    
+     
     sig_pulse = scipy.signal.medfilt(sig_pulse, 501)
     #sig_emg = preprocessing.filter_iir_fwbw(sig_emg, fs_in=2000.0, 
     #        fs_out=2000.0, fc1=1.0, fc2=25.0, degree=3, plot=False)
@@ -169,7 +169,18 @@ def extract_targets_emg(block_data, debug=False):
     # threshold
     sig_pulse[sig_pulse <0.5] = 0
     sig_pulse[sig_pulse >= 0.5] = 1
-     
+    
+    if plot and False:
+        plt.figure()
+        plt.plot(sig_pulse[::1], 'k--', linewidth=1.5)
+        plt.plot(sig_emg[::1]/sig_emg.max(), 'k', linewidth=1.0)
+        plt.xlabel('Time (ms)', fontsize=16)
+        plt.ylabel('Normalized Amplitude', fontsize=16)
+        plt.legend(['Sync Signal', 'EMG Signal'], 
+                loc='lower left')
+        plt.ylim(0,1.1)
+        plt.tight_layout()
+        pdb.set_trace()
     
     step_ups = np.nonzero(np.diff(sig_pulse)>0)[0]
     step_downs = np.nonzero(np.diff(sig_pulse)<0)[0]
@@ -196,6 +207,25 @@ def extract_targets_emg(block_data, debug=False):
     for  (step_up,step_down) in zip(step_ups,step_downs):
         emg_parts.append(sig_emg[step_up:step_down])
     
+    if plot:
+        plt.figure()
+        part = emg_parts[0][::1] / emg_parts[0][::1].max()
+        plt.plot(part, 'k')
+        sel_point_y = np.median(np.sort(part)[int(0.95*len(part)):])
+        max_point_y = np.max(part)
+        range_x = np.arange(0,len(part))
+        fig_1, = plt.plot(range_x,sel_point_y*np.ones((len(part),)), 
+                'k--', linewidth=2.0)
+        fig_2, = plt.plot(range_x,max_point_y*np.ones((len(part),)), 
+                'k-.', linewidth=2.0)
+        plt.xlabel('Time (ms)', fontsize=16)
+        plt.ylabel('Normalized Amplitude', fontsize=16)
+        plt.ylim(0,1.1)
+        plt.legend([fig_1,fig_2],
+                ['Proposed Method', 'Maximum Value'], loc='lower right')
+        plt.tight_layout()
+        pdb.set_trace()
+
     if len(emg_parts) != 3:
         if debug:
             plt.clf()

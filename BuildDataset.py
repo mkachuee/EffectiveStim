@@ -19,7 +19,7 @@ SUBJECT_NAME = '718885'
 #DB_PATH = '/home/' + getpass.getuser() + '/Database/' + SUBJECT_NAME +'/'
 DB_PATH = '/media/' + getpass.getuser() + '/Data/Database/' + SUBJECT_NAME +'/'
 
-TARGET_SIGNAL = 'mvc'
+TARGET_SIGNAL = 'emg'
 
 note_files = glob.glob(DB_PATH + 'Note/*.csv')
 data_files = glob.glob(DB_PATH + 'Data/*/')
@@ -79,8 +79,8 @@ for note_file in note_files:
         if TARGET_SIGNAL == 'mvc':
             session_target = process_block.extract_targets_mvc(block_data, debug=False)
         else:
-            session_target = process_block.extract_targets_emg(block_data, debug=False)
-        
+            session_target = process_block.extract_targets_emg(block_data, 
+                    debug=False, plot=True)        
         if session_target is None:
             print('WARNING: extract target failed.')
             continue

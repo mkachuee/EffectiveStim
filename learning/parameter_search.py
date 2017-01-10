@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 
-import supervised_learning
+import learning.supervised_learning
 
 plt.ion()
 
@@ -29,7 +29,7 @@ def gsearch_expsel(features, targets, ids,
         # transform to get a new target
         targets_trans = targets.dot(theta)
         # train and evaluate an estimator using the new target
-        accu = supervised_learning.regress_svr(features=features, 
+        accu = learning.supervised_learning.regress_svr(features=features, 
             targets=targets_trans.ravel(), ids=ids, 
             params={'kernel':['linear'], 
                 'C':10.0**np.linspace(0,2,10)}, n_folds=10)
@@ -81,7 +81,7 @@ def lsearch_expsel(features, targets, ids,
             targets_trans = targets.dot(succ)
 
             # train and evaluate an estimator using the new target
-            accu = supervised_learning.regress_svr(features=features, 
+            accu = learning.supervised_learning.regress_svr(features=features, 
                 targets=targets_trans.ravel(), ids=ids, 
                 params={'kernel': ['rbf'], 'C': 10.0**np.linspace(0,2,5),
                     'gamma': 10.0**np.linspace(-3,-1,5),
